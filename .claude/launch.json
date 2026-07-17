@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "flowpilot",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["server.py"],
+      "port": 8321
+    }
+  ]
+}

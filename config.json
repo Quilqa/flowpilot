@@ -1,0 +1,11 @@
+{
+  "port": 8321,
+  "default_confidence": 0.85,
+  "default_poll_interval_ms": 250,
+  "default_poll_timeout_ms": 5000,
+  "start_delay_ms": 3000,
+  "max_duration_ms": 1800000,
+  "loop_guard_iterations": 10000,
+  "failsafe": true,
+  "panic_hotkey": "ctrl+alt+esc"
+}

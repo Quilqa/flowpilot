@@ -1,0 +1,150 @@
+{
+  "name": "demo_ifelse",
+  "version": 1,
+  "inputs": [
+    {
+      "name": "username",
+      "default": "john",
+      "label": "User"
+    }
+  ],
+  "settings": {
+    "start_delay_ms": 3000,
+    "max_duration_ms": 1800000,
+    "loop_guard_iterations": 10000,
+    "failsafe": true
+  },
+  "nodes": [
+    {
+      "id": "start",
+      "type": "start",
+      "params": {},
+      "position": {
+        "x": 40.0,
+        "y": 200.0
+      }
+    },
+    {
+      "id": "cond",
+      "type": "image_condition",
+      "params": {
+        "template": "",
+        "confidence": 0.85,
+        "mode": "poll",
+        "timeout_ms": 5000,
+        "interval_ms": 250,
+        "grayscale": true
+      },
+      "position": {
+        "x": 240.0,
+        "y": 180.0
+      }
+    },
+    {
+      "id": "m1",
+      "type": "mouse_move",
+      "params": {
+        "x": 1130,
+        "y": 1055,
+        "duration_ms": 300
+      },
+      "position": {
+        "x": 480.0,
+        "y": 100.0
+      }
+    },
+    {
+      "id": "c1",
+      "type": "mouse_click",
+      "params": {
+        "button": "left"
+      },
+      "position": {
+        "x": 680.0,
+        "y": 100.0
+      }
+    },
+    {
+      "id": "m2",
+      "type": "mouse_move",
+      "params": {
+        "x": 560,
+        "y": 884,
+        "duration_ms": 300
+      },
+      "position": {
+        "x": 880.0,
+        "y": 100.0
+      }
+    },
+    {
+      "id": "c2",
+      "type": "mouse_click",
+      "params": {
+        "button": "left"
+      },
+      "position": {
+        "x": 1080.0,
+        "y": 100.0
+      }
+    },
+    {
+      "id": "alt",
+      "type": "type_text",
+      "params": {
+        "text": "not found path {username}"
+      },
+      "position": {
+        "x": 480.0,
+        "y": 320.0
+      }
+    },
+    {
+      "id": "end",
+      "type": "end",
+      "params": {
+        "exit_code": 0
+      },
+      "position": {
+        "x": 1280.0,
+        "y": 180.0
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "start",
+      "to": "cond"
+    },
+    {
+      "from": "cond",
+      "to": "m1",
+      "port": "yes"
+    },
+    {
+      "from": "cond",
+      "to": "alt",
+      "port": "no"
+    },
+    {
+      "from": "m1",
+      "to": "c1"
+    },
+    {
+      "from": "c1",
+      "to": "m2"
+    },
+    {
+      "from": "m2",
+      "to": "c2"
+    },
+    {
+      "from": "c2",
+      "to": "end"
+    },
+    {
+      "from": "alt",
+      "to": "end"
+    }
+  ]
+}
