@@ -11,6 +11,7 @@ ROOT = Path(__file__).resolve().parent.parent
 FLOWS_DIR = ROOT / "flows"
 TEMPLATES_DIR = ROOT / "templates"
 LOGS_DIR = ROOT / "logs"
+SCREENSHOTS_DIR = ROOT / "screenshots"
 CONFIG_PATH = ROOT / "config.json"
 
 DEFAULT_CONFIG: dict[str, Any] = {
@@ -28,7 +29,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
 
 def ensure_dirs() -> None:
     """Create the standard project folders if they do not exist."""
-    for d in (FLOWS_DIR, TEMPLATES_DIR, LOGS_DIR):
+    for d in (FLOWS_DIR, TEMPLATES_DIR, LOGS_DIR, SCREENSHOTS_DIR):
         d.mkdir(parents=True, exist_ok=True)
 
 
@@ -57,6 +58,20 @@ def template_dir_for(flow_name: str) -> Path:
     d = TEMPLATES_DIR / _safe_name(flow_name)
     d.mkdir(parents=True, exist_ok=True)
     return d
+
+
+def safe_filename(name: str, ext: str = ".png") -> str:
+    """Reduce a user-supplied file name to a flat, safe name with `ext`.
+
+    Screenshot names come from a flow parameter and may contain interpolated
+    variables, so drop any directory component and traversal before it is
+    joined onto a project folder.
+    """
+    stem = name.strip().replace("\\", "/").split("/")[-1]
+    if stem.lower().endswith(ext.lower()):
+        stem = stem[: -len(ext)]
+    cleaned = "".join(c for c in stem if c.isalnum() or c in ("-", "_", " ", ".")).strip(" .")
+    return f"{cleaned or 'screenshot'}{ext}"
 
 
 def _safe_name(name: str) -> str:

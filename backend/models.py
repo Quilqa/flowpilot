@@ -25,6 +25,8 @@ NODE_TYPES = {
     "wait",
     "image_condition",
     "counter_condition",
+    # screen
+    "screenshot",
     # variables & clipboard
     "set_variable",
     "copy_to_variable",

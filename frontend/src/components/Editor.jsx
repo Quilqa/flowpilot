@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ReactFlow, {
   Background, Controls, MiniMap, addEdge,
-  useNodesState, useEdgesState, MarkerType,
+  useNodesState, useEdgesState,
 } from "reactflow";
 import { api } from "../api.js";
+import { buildPaste, copySelection, makeEdge, parseClip } from "../clipboard.js";
 import { NODE_DEFS, defaultParams, isCondition } from "../nodeTypes.js";
 import { nodeSummary } from "../summary.js";
 import FlowNode from "./FlowNode.jsx";
@@ -23,15 +24,7 @@ function flowToRf(flow) {
     position: n.position || { x: 200, y: 100 },
     data: { nodeType: n.type, params: n.params || {}, summary: nodeSummary(n.type, n.params || {}) },
   }));
-  const edges = flow.edges.map((e, i) => ({
-    id: `e${i}_${e.from}_${e.to}`,
-    source: e.from,
-    target: e.to,
-    sourceHandle: e.port === "yes" || e.port === "no" ? e.port : null,
-    label: e.port === "yes" ? "Yes" : e.port === "no" ? "No" : undefined,
-    markerEnd: { type: MarkerType.ArrowClosed },
-    style: { stroke: e.port === "yes" ? "#16a34a" : e.port === "no" ? "#dc2626" : "#94a3b8" },
-  }));
+  const edges = flow.edges.map((e, i) => makeEdge(e.from, e.to, e.port, `e${i}_${e.from}_${e.to}`));
   return { nodes, edges };
 }
 
@@ -85,13 +78,7 @@ export default function Editor({ flowName, onBack }) {
       } else {
         filtered = eds.filter((e) => e.source !== conn.source);
       }
-      const port = conn.sourceHandle;
-      return addEdge({
-        ...conn,
-        label: port === "yes" ? "Yes" : port === "no" ? "No" : undefined,
-        markerEnd: { type: MarkerType.ArrowClosed },
-        style: { stroke: port === "yes" ? "#16a34a" : port === "no" ? "#dc2626" : "#94a3b8" },
-      }, filtered);
+      return addEdge({ ...conn, ...makeEdge(conn.source, conn.target, conn.sourceHandle) }, filtered);
     });
     markDirty();
   }, [nodes, setEdges, markDirty]);
@@ -129,6 +116,84 @@ export default function Editor({ flowName, onBack }) {
     setSelectedId(null);
     markDirty();
   }, [setNodes, setEdges, markDirty]);
+
+  // --- Copy / paste of node sub-graphs -----------------------------------
+  // The system clipboard carries the payload, so a construct copied here can
+  // be pasted into a different flow. clipRef is the in-session fallback for
+  // when the browser hands us no clipboard text.
+  const clipRef = useRef(null);
+  const pasteSeqRef = useRef(0);
+  const clipSigRef = useRef("");
+
+  const copyNow = useCallback(() => {
+    const clip = copySelection(nodes, edges);
+    if (!clip) {
+      setStatus("Nothing to copy — select node(s) first (Shift+drag for several)");
+      return null;
+    }
+    clipRef.current = clip;
+    const parts = [`Copied ${clip.nodes.length} node${clip.nodes.length > 1 ? "s" : ""}`];
+    if (clip.edges.length) parts.push(`${clip.edges.length} connection${clip.edges.length > 1 ? "s" : ""}`);
+    if (clip.skippedStart) parts.push("Start skipped");
+    setStatus(parts.join(" · "));
+    return clip;
+  }, [nodes, edges]);
+
+  const pasteClip = useCallback((clip) => {
+    // Stagger repeated pastes of the same payload so copies don't stack up
+    // exactly on top of each other.
+    const sig = JSON.stringify(clip.nodes.map((n) => n.id));
+    if (sig !== clipSigRef.current) { clipSigRef.current = sig; pasteSeqRef.current = 0; }
+    pasteSeqRef.current += 1;
+    const d = 40 * pasteSeqRef.current;
+
+    const { nodes: added, edges: addedEdges } = buildPaste(clip, { x: d, y: d }, newId);
+    // The paste becomes the new selection, so it can be dragged straight away.
+    setNodes((nds) => nds.map((n) => (n.selected ? { ...n, selected: false } : n)).concat(added));
+    setEdges((eds) => eds.concat(addedEdges));
+    setSelectedId(added.length === 1 ? added[0].id : null);
+    markDirty();
+    setStatus(`Pasted ${added.length} node${added.length > 1 ? "s" : ""}`);
+  }, [setNodes, setEdges, markDirty]);
+
+  useEffect(() => {
+    // Never hijack copy/paste while the caret is in a parameter field.
+    const editable = (t) => !!t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable);
+
+    const onCopy = (e) => {
+      if (editable(e.target)) return;
+      const clip = copyNow();
+      if (!clip) return; // nothing selected: let the browser copy normally
+      e.preventDefault();
+      e.clipboardData?.setData("text/plain", JSON.stringify(clip));
+    };
+
+    const onPaste = (e) => {
+      if (editable(e.target)) return;
+      const clip = parseClip(e.clipboardData?.getData("text/plain")) || clipRef.current;
+      if (!clip) return; // unrelated clipboard content: leave it alone
+      e.preventDefault();
+      pasteClip(clip);
+    };
+
+    const onKey = (e) => {
+      if (editable(e.target)) return;
+      if ((e.ctrlKey || e.metaKey) && (e.key === "d" || e.key === "D")) {
+        e.preventDefault(); // browsers bind Ctrl+D to bookmark
+        const clip = copyNow();
+        if (clip) pasteClip(clip);
+      }
+    };
+
+    window.addEventListener("copy", onCopy);
+    window.addEventListener("paste", onPaste);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("copy", onCopy);
+      window.removeEventListener("paste", onPaste);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [copyNow, pasteClip]);
 
   const save = useCallback(async () => {
     if (!meta) return;
@@ -168,6 +233,9 @@ export default function Editor({ flowName, onBack }) {
         <button className="btn small" onClick={onBack}>← Flows</button>
         <span className="editor-title">{meta.name}</span>
         <div className="spacer" />
+        <span className="shortcut-hint" title="Shift+drag to box-select. Ctrl+C / Ctrl+V copies nodes with the connections between them — across flows too. Ctrl+D duplicates in place.">
+          Shift+drag select · Ctrl+C/V copy · Ctrl+D duplicate
+        </span>
         <span className="status-text">{status}</span>
         <button className="btn small" onClick={() => setShowSettings(true)}>⚙ Settings</button>
         <button className="btn small primary" onClick={save}>Save</button>

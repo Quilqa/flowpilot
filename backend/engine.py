@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Optional
 
-from . import automation, config
+from . import automation, capture, config
 from .matching import match_template
 from .models import Edge, Flow, Node
 
@@ -329,6 +329,10 @@ class FlowRunner:
             self._do_wait(node)
             return None, None
 
+        if t == "screenshot":
+            self._do_screenshot(node)
+            return None, None
+
         if t == "image_condition":
             return self._do_image_condition(node), None
 
@@ -369,6 +373,30 @@ class FlowRunner:
             ms = self._int(node, "duration_ms", 0)
         self.emit("wait", ms=ms)
         self._sleep(ms)
+
+    def _do_screenshot(self, node: Node) -> None:
+        """Save a PNG of the screen (or a region) into screenshots/."""
+        # Milliseconds are included so a screenshot inside a loop does not
+        # overwrite the previous iteration's file.
+        stamp = time.strftime("%Y%m%d_%H%M%S") + f"_{int(time.time() * 1000) % 1000:03d}"
+        raw = str(self._p(node, "filename", "")).strip()
+        # `{timestamp}` is resolved here rather than from the variable map, so
+        # it works without the flow declaring anything. A user variable of the
+        # same name wins, since interpolation already ran.
+        raw = raw.replace("{timestamp}", stamp)
+        if not raw:
+            raw = f"{self.flow.name}_{stamp}"
+
+        path = config.SCREENSHOTS_DIR / config.safe_filename(raw, ".png")
+        path.parent.mkdir(parents=True, exist_ok=True)
+        data = capture.capture_png(self._region(node))
+        path.write_bytes(data)
+
+        var = str(node.params.get("variable") or "screenshot_path").strip()
+        if var:
+            self.variables[var] = str(path)
+            self.emit("variable_set", name=var, value=str(path))
+        self.emit("screenshot", node_id=node.id, path=str(path), bytes=len(data))
 
     def _do_image_condition(self, node: Node) -> str:
         p = node.params

@@ -22,6 +22,8 @@ export function nodeSummary(type, p = {}) {
       return p.random ? `${p.min_ms}–${p.max_ms}ms` : `${p.duration_ms ?? 0}ms`;
     case "image_condition":
       return `${(p.template || "").split("/").pop() || "no template"} @${p.confidence ?? 0.85}${p.mode === "poll" ? " (poll)" : ""}`;
+    case "screenshot":
+      return `${p.filename || "auto"}${p.region ? " (region)" : " (full)"}`;
     case "counter_condition":
       return `${p.variable || "?"} ${p.operator || "<"} ${p.value ?? "?"}`;
     case "set_variable":

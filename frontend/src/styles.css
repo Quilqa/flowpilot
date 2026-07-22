@@ -65,6 +65,7 @@ body {
 .editor-title { font-weight: 600; }
 .spacer { flex: 1; }
 .status-text { color: var(--muted); font-size: 12px; }
+.shortcut-hint { color: var(--muted); font-size: 11px; opacity: .65; margin-right: 12px; white-space: nowrap; }
 .editor-body { display: flex; flex: 1; min-height: 0; }
 
 /* Palette */

@@ -12,7 +12,7 @@
 //   template- image template picker/capture
 //   region  - screen rectangle picker
 
-export const GROUPS = ["Mouse", "Keyboard", "Flow", "Variables"];
+export const GROUPS = ["Mouse", "Keyboard", "Flow", "Screen", "Variables"];
 
 const BUTTONS = [
   { value: "left", label: "Left" },
@@ -137,6 +137,18 @@ export const NODE_DEFS = {
         { value: "contains", label: "contains" },
       ] },
       { key: "value", type: "text", label: "Compare to", hint: "literal or {var}" },
+    ],
+  },
+
+  // --- Screen ---
+  screenshot: {
+    label: "Screenshot", group: "Screen", color: "#7c3aed", ports: "linear",
+    fields: [
+      { key: "region", type: "region", label: "Region", hint: "Empty = whole screen" },
+      { key: "filename", type: "text", label: "File name", default: "",
+        hint: "Blank = auto. {timestamp} and {var} allowed; saved to screenshots/" },
+      { key: "variable", type: "text", label: "Store path in", default: "screenshot_path",
+        hint: "Variable holding the saved file path" },
     ],
   },
 

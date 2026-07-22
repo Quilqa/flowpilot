@@ -56,6 +56,29 @@ cd frontend && npm run dev  # terminal 2 (UI on :5173, proxies to the API)
 4. Click a node to edit its parameters on the right.
 5. `Ctrl+S` to save. The flow auto-saves every 30 seconds.
 
+### Reusing blocks (copy / paste)
+
+Select nodes and copy them **with the connections between them**, so a
+multi-node construct (a counter loop, an alt-tab scan) can be rebuilt in one
+paste instead of by hand.
+
+| Key | Action |
+|---|---|
+| `Shift`+drag | Box-select several nodes (`Ctrl`+click toggles one) |
+| `Ctrl+C` | Copy the selection |
+| `Ctrl+V` | Paste — new ids, offset slightly, pasted nodes become the selection |
+| `Ctrl+D` | Duplicate the selection in place |
+
+- Only edges with **both** ends inside the selection are copied; an edge
+  leaving the selection would have nowhere to land.
+- The **Start** node is never copied (a flow may only have one).
+- The payload is JSON on the system clipboard, so it survives **across flows**
+  and browser tabs — copy a loop out of one flow and paste it into another.
+  You can also paste it into a text file to keep a snippet library.
+- Pasted nodes arrive unconnected to the rest of the graph; wire them in by
+  dragging from a port. Until then they show as *orphan* warnings on save.
+- Copy/paste inside a parameter text field behaves normally (text, not nodes).
+
 ### Node types
 
 | Group | Nodes |
@@ -63,6 +86,7 @@ cd frontend && npm run dev  # terminal 2 (UI on :5173, proxies to the API)
 | **Mouse** | Move, Down, Up, Click, Scroll |
 | **Keyboard** | Key Down, Key Up, Key Press, Type Text, Shortcut (presets + custom combo) |
 | **Flow** | Wait, Image Condition, Counter Condition, End |
+| **Screen** | Screenshot |
 | **Variables** | Set Variable, Copy to Variable, Paste Variable, Prompt Input |
 
 ### Coordinates & templates
@@ -76,6 +100,24 @@ cd frontend && npm run dev  # terminal 2 (UI on :5173, proxies to the API)
   Mouse Move can target `{match_x}`, `{match_y}`.
 - **Capture from screen** — countdown, then drag a rectangle to crop a template
   into `templates/<flow>/`.
+
+### Screenshot node
+
+Saves a PNG of the screen (or a region) into `screenshots/` while the flow
+runs — useful for recording what a flow saw at a given step.
+
+- **Region** — empty captures the whole screen; otherwise use the rectangle
+  picker, same as Image Condition.
+- **File name** — blank auto-names it `<flow>_<timestamp>.png`. You may use
+  `{timestamp}` and any flow variable, e.g. `login_{i}_{timestamp}`.
+  A fixed name overwrites on each pass; include `{timestamp}` or a loop
+  counter such as `{i}` to keep every iteration. The timestamp carries
+  milliseconds, so a tight loop still produces distinct files.
+- **Store path in** — the variable receiving the saved path (default
+  `screenshot_path`), so a later node can reference `{screenshot_path}`.
+
+File names are flattened to stay inside `screenshots/` — a name containing
+path separators cannot write elsewhere.
 
 ### Variables
 
@@ -179,6 +221,7 @@ was captured, or the target rendering at a different size.
 flowpilot/
 ├─ flows/            # saved flows (one JSON per flow)
 ├─ templates/        # template PNGs, per-flow subfolders
+├─ screenshots/      # PNGs saved by Screenshot nodes
 ├─ logs/             # run logs (one file per run)
 ├─ backend/          # FastAPI app + execution engine
 ├─ frontend/         # React + React Flow UI (built to frontend/dist)

@@ -47,6 +47,7 @@ export default function RunView({ flowName, inputs, onClose, onActiveNode }) {
         setLiveVars((v) => ({ ...v, [e.name]: e.value }));
         addLog(`   set ${e.name} = ${e.value}`, "muted"); break;
       case "wait": addLog(`   wait ${e.ms}ms`, "muted"); break;
+      case "screenshot": addLog(`   📷 saved ${String(e.path).split(/[\\/]/).pop()}`, "ok"); break;
       case "paused": setPaused(true); addLog("⏸ Paused", "warn"); break;
       case "resumed": setPaused(false); addLog("▶ Resumed", "ok"); break;
       case "error": addLog(`⛔ ${e.message}`, "err"); break;
