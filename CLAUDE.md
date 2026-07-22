@@ -1,0 +1,121 @@
+# FlowPilot — working notes for Claude Code
+
+Visual builder for Windows desktop automation. Flows are JSON node graphs, run
+from a React UI, the CLI, or Task Scheduler. `README.md` is the user-facing
+doc; this file is the stuff that costs time to rediscover.
+
+## Layout
+
+```
+server.py        web UI entry point (uvicorn + panic hotkey)
+runner.py        headless CLI runner
+backend/
+  models.py      Flow/Node/Edge pydantic models + validate_flow()  ← NODE_TYPES lives here
+  engine.py      FlowRunner: graph traversal, variables, one _execute() per node type
+  automation.py  mouse/keyboard/clipboard wrappers (pyautogui + sendinput)
+  sendinput.py   Win32 SendInput: scan codes (key positions) + Unicode (characters)
+  capture.py     mss screen capture, DPI awareness
+  matching.py    OpenCV template matching
+  server.py      FastAPI routes + WebSocket run stream
+  storage.py     flow file IO
+frontend/src/
+  nodeTypes.js   NODE_DEFS registry — drives palette, param editor, ports
+  summary.js     one-line node summary shown on the canvas
+  clipboard.js   copy/paste of node sub-graphs
+  components/Editor.jsx  React Flow canvas, save/autosave, keyboard shortcuts
+```
+
+## Running it
+
+```powershell
+python server.py                       # foreground, console
+wscript start_silent.vbs               # windowless; stop with stop_silent.vbs
+cd frontend && npm run build           # required after ANY frontend edit
+cd frontend && npm run dev             # :5173, proxies /api and /ws to :8321
+```
+
+- **The frontend is served from `frontend/dist/`.** Editing `frontend/src` does
+  nothing until you `npm run build`. A browser refresh then picks it up.
+- **Backend edits need a server restart** — the running process holds the old
+  modules. Use `stop_silent.vbs` then `start_silent.vbs`.
+- The user typically keeps the silent server running. Check before starting your
+  own: `Get-NetTCPConnection -LocalPort 8321 -State Listen`.
+
+## Adding a node type
+
+Six places, and validation fails loudly if you miss the first:
+
+1. `backend/models.py` → add the id to `NODE_TYPES` (and `CONDITION_TYPES` if it
+   branches yes/no).
+2. `backend/engine.py` → a branch in `_execute()`. Return
+   `(port, result)`; action nodes return `(None, None)`, conditions return
+   `("yes"|"no", None)`. Use `self._p/_int/_opt_int` so params get `{var}`
+   interpolation.
+3. `frontend/src/nodeTypes.js` → an entry in `NODE_DEFS`. `ports` is
+   `linear` | `condition` | `in` | `start`. Field types: text, textarea, number,
+   select, checkbox, xy, key, template, region. Add the group to `GROUPS` if new.
+4. `frontend/src/summary.js` → a `case` for the canvas one-liner.
+5. `frontend/src/components/RunView.jsx` → a `case` if the node emits a custom
+   event (the switch ignores unknown types silently).
+6. `README.md` node table, then `npm run build`.
+
+## Gotchas that have bitten before
+
+- **Autosave persists your experiments.** The editor autosaves every 30 s when
+  dirty. Adding a test node to a real flow *will* be written to `flows/*.json`.
+  Delete test nodes promptly, or work on a throwaway flow.
+- **Flows and templates are gitignored** (`flows/*` except `demo_ifelse.json`,
+  `templates/*`, `screenshots/*`, `logs/*.log`). They are personal user data;
+  don't force-add without asking.
+- **`pythonw` has no stdout.** `server.py` prints at startup, so running it under
+  `pythonw` without redirecting output kills the process instantly and silently.
+  `start_silent.vbs` redirects to `logs/server_silent.log` — keep that.
+- **Typing vs key pressing.** `type_text` sends *characters* (SendInput
+  `KEYEVENTF_UNICODE`) and is layout-independent. `key_press`/`key_down`/`key_up`
+  /`shortcut` send *key positions* (scan codes), which is what emulators and
+  games need — but under a non-Latin layout a Key Press of `a` types `ф`. Don't
+  "unify" these; the split is deliberate.
+- **Held keys leak on abort.** Panic/Stop raises `RunAborted` and unwinds without
+  releasing keys, so aborting between `Key Down alt` and `Key Up alt` leaves Alt
+  stuck. Tap the key to clear.
+- **The loop guard resets on `wait`.** `_loop_counter` is cleared whenever a Wait
+  node runs, so deliberately paced loops don't trip it. Loops are made by
+  pointing an edge backwards — there is no loop node.
+- **Coordinates are DPI-sensitive.** `capture.set_dpi_awareness()` runs once at
+  startup, before any capture or mouse move; changing it mid-process shifts the
+  coordinate space.
+- **Python here is x64 on an ARM64 machine** (runs under emulation). Don't repin
+  `requirements.txt` to ARM64 wheels — `opencv-python` 4.10 and `pywin32` 308
+  have no win_arm64 builds.
+
+## Testing
+
+GUI automation is awkward to test directly. What works:
+
+- **Engine logic without real input:** monkeypatch `engine.automation` with a
+  recorder and stub `FlowRunner._do_image_condition` / `_sleep`. Lets you assert
+  the exact key sequence a loop produces.
+- **Structure:** `validate_flow(Flow.model_validate(json))` — returns errors and
+  warnings; run it after generating any flow JSON.
+- **Real input:** create a focused window and read back what arrived. For
+  layout-sensitive work, a raw `RegisterClassW` window recording `WM_CHAR` is
+  ground truth — a Tk `Entry` mangles non-ASCII through the ANSI codepage and
+  will lie to you.
+- **Frontend logic:** run `npm run dev` and `await import('/src/foo.js')` from
+  the browser console to exercise real modules without a test harness.
+
+### Preview-browser caveat
+
+In the in-app preview browser, `ResizeObserver` never fires, so **React Flow
+renders no edges at all** and screenshots often time out. Nodes and the DOM are
+fine. Don't chase this as a bug — verify edges via saved JSON or React state
+instead. Multi-select via synthetic mouse events also doesn't work there.
+
+## Conventions
+
+- Comments explain *why*, not what; match the surrounding density.
+- Engine node handlers stay small — push real work into `automation`/`capture`
+  /`matching`.
+- User-supplied strings that become file names go through
+  `config.safe_filename()` (they may contain interpolated variables).
+- Keep `git commit` to when asked. Flows/templates stay out of commits.
