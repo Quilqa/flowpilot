@@ -19,6 +19,7 @@ from ctypes import wintypes
 
 INPUT_KEYBOARD = 1
 KEYEVENTF_KEYUP = 0x0002
+KEYEVENTF_UNICODE = 0x0004
 KEYEVENTF_SCANCODE = 0x0008
 KEYEVENTF_EXTENDEDKEY = 0x0001
 MAPVK_VK_TO_VSC = 0
@@ -112,3 +113,30 @@ def key_down(key: str) -> None:
 
 def key_up(key: str) -> None:
     key_event(key, up=True)
+
+
+# --- Text entry --------------------------------------------------------------
+
+
+def _utf16_units(ch: str) -> list[int]:
+    """The UTF-16 code units of a character (a surrogate pair above U+FFFF)."""
+    data = ch.encode("utf-16-le")
+    return [int.from_bytes(data[i:i + 2], "little") for i in range(0, len(data), 2)]
+
+
+def type_char(ch: str) -> None:
+    """Type one character as a Unicode event, independent of keyboard layout.
+
+    The scan-code path above sends a key *position*, which Windows translates
+    through the active layout — so pressing the "A" key with a Russian layout
+    selected yields 'ф'. Digits and '.' sit on the same keys in every Latin
+    /Cyrillic layout, which is why they alone appeared to work.
+
+    KEYEVENTF_UNICODE instead delivers the character itself (the target gets
+    WM_CHAR), so text arrives correctly whatever layout is active, and
+    accented/emoji characters work without a clipboard round-trip. wVk must be
+    0 for these events; the code unit travels in wScan.
+    """
+    for unit in _utf16_units(ch):
+        _send(0, unit, KEYEVENTF_UNICODE)
+        _send(0, unit, KEYEVENTF_UNICODE | KEYEVENTF_KEYUP)

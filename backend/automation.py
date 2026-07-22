@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import time
-from typing import Callable, Optional
+from typing import Any, Callable, Optional
 
 
 def _pg():
@@ -175,31 +175,51 @@ def key_press(key: str, hold_ms: int = 30) -> None:
         key_up(p)
 
 
+def _unicode_typing() -> Optional[Any]:
+    """The sendinput module when Unicode typing is usable, else None."""
+    import sys
+
+    if sys.platform != "win32":
+        return None
+    try:
+        from . import sendinput
+
+        return sendinput
+    except Exception:
+        return None
+
+
 def type_text(text: str, per_char_delay_ms: int = 0) -> None:
-    """Type text, handling non-ASCII characters.
+    """Type text, independent of the active keyboard layout.
 
-    pyautogui.typewrite silently skips characters outside its key table
-    (accents, emoji, etc.). Type the ASCII-printable run directly for speed,
-    and paste anything else via the clipboard so nothing is dropped.
+    pyautogui.typewrite presses virtual keys as though the US layout were
+    active. With a non-Latin layout selected (RU/UA/…) Windows maps those key
+    positions through that layout, so letters arrive as the wrong characters —
+    while digits and '.' occupy the same keys in both layouts and appear to
+    work. Sending each character as a Unicode event avoids the layout entirely
+    and also covers accents/emoji, which typewrite silently drops.
+
+    Enter/Tab are still sent as real keys: a WM_CHAR newline is ignored by most
+    inputs, whereas Enter is what "type a line" is expected to mean.
     """
-    pg = _pg()
-    interval = max(0, per_char_delay_ms) / 1000.0
+    si = _unicode_typing()
+    delay = max(0, per_char_delay_ms) / 1000.0
 
-    def typeable(ch: str) -> bool:
-        return 32 <= ord(ch) < 127 or ch in ("\n", "\t")
-
-    # Fast path: all-ASCII text types directly.
-    if all(typeable(c) for c in text):
-        pg.typewrite(text, interval=interval)
+    if si is None:  # non-Windows: best effort via pyautogui
+        _pg().typewrite(text, interval=delay)
         return
 
     for ch in text:
-        if typeable(ch):
-            pg.typewrite(ch, interval=interval)
+        if ch == "\n":
+            key_press("enter", 30)
+        elif ch == "\t":
+            key_press("tab", 30)
+        elif ch == "\r":
+            continue  # CRLF: the \n already produced the Enter
         else:
-            paste_value(ch)  # clipboard round-trip for unsupported characters
-            if interval:
-                time.sleep(interval)
+            si.type_char(ch)
+        if delay:
+            time.sleep(delay)
 
 
 # Preset shortcuts (name -> combo string).

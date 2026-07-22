@@ -192,6 +192,20 @@ WebSocket support. Fix:
 py -m pip install "uvicorn[standard]" websockets
 ```
 
+**Type Text produced only digits and dots (letters missing or wrong)** — fixed.
+Text is now sent as Unicode characters via `SendInput`, which ignores the
+keyboard layout entirely. Previously it pressed *virtual keys* as if the US
+layout were active, so with a non-Latin layout selected (Russian, Ukrainian,
+Greek…) Windows mapped those key positions through that layout and letters
+came out wrong, while digits and `.` — which sit on the same keys in both
+layouts — appeared to work.
+
+> Note the deliberate split: **Type Text** sends characters (layout
+> independent, correct for text fields), while **Key Press / Key Down / Key Up
+> / Shortcut** send *key positions* via scan codes — which is what games and
+> emulator key-mappers need. So a Key Press of `a` under a Russian layout
+> types `ф` in a text box; use Type Text for text.
+
 **Key presses don't register in a game / Android emulator (MuMu, BlueStacks…)**
 — keys are sent via Win32 `SendInput` with hardware scan codes, which these
 apps accept. If a mapped key still doesn't trigger:
