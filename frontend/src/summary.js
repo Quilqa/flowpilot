@@ -22,6 +22,12 @@ export function nodeSummary(type, p = {}) {
       return p.random ? `${p.min_ms}–${p.max_ms}ms` : `${p.duration_ms ?? 0}ms`;
     case "image_condition":
       return `${(p.template || "").split("/").pop() || "no template"} @${p.confidence ?? 0.85}${p.mode === "poll" ? " (poll)" : ""}`;
+    case "function_start":
+      return p.name ? `ƒ ${p.name}` : "unnamed";
+    case "call_function":
+      return p.name ? `→ ${p.name}()` : "no function";
+    case "function_return":
+      return "↩ return";
     case "screenshot":
       return `${p.filename || "auto"}${p.region ? " (region)" : " (full)"}`;
     case "counter_condition":

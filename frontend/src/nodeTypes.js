@@ -12,7 +12,12 @@
 //   template- image template picker/capture
 //   region  - screen rectangle picker
 
-export const GROUPS = ["Mouse", "Keyboard", "Flow", "Screen", "Variables"];
+export const GROUPS = ["Mouse", "Keyboard", "Flow", "Screen", "Variables", "Functions"];
+
+// Functions get their own hue: their nodes, palette group and the shaded area
+// drawn behind each body all use it, so a function reads as a separate region
+// of the canvas rather than part of the main path.
+export const FUNCTION_COLOR = "#0d9488";
 
 const BUTTONS = [
   { value: "left", label: "Left" },
@@ -150,6 +155,26 @@ export const NODE_DEFS = {
       { key: "variable", type: "text", label: "Store path in", default: "screenshot_path",
         hint: "Variable holding the saved file path" },
     ],
+  },
+
+  // --- Functions ---
+  // A function body is entered by calling it, never by an edge from Start, so
+  // function_start has a source handle only — like Start itself.
+  function_start: {
+    label: "Function", group: "Functions", color: FUNCTION_COLOR, ports: "start",
+    fields: [
+      { key: "name", type: "text", label: "Function name", hint: "e.g. tap_ok — call it with a Call node" },
+    ],
+  },
+  call_function: {
+    label: "Call Function", group: "Functions", color: FUNCTION_COLOR, ports: "linear",
+    fields: [
+      { key: "name", type: "function", label: "Function", hint: "Runs the function, then continues here" },
+    ],
+  },
+  function_return: {
+    label: "Return", group: "Functions", color: FUNCTION_COLOR, ports: "in",
+    fields: [],
   },
 
   // --- Variables & clipboard ---

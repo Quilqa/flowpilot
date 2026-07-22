@@ -56,6 +56,31 @@ cd frontend && npm run dev  # terminal 2 (UI on :5173, proxies to the API)
 4. Click a node to edit its parameters on the right.
 5. `Ctrl+S` to save. The flow auto-saves every 30 seconds.
 
+### Functions (reusable named sub-flows)
+
+For a sequence you use repeatedly, define it **once** as a function instead of
+pasting copies — fix the function and every call site changes with it.
+
+1. Drag a **Function** node onto an empty part of the canvas and give it a
+   name (e.g. `tap_ok`). Build the body after it, ending with **Return**.
+2. Anywhere in the flow, drop a **Call Function** node and pick the name from
+   the dropdown. Execution jumps into the function and comes back to the node
+   after the call.
+
+The body is drawn inside a shaded, labelled area so it reads as its own region
+of the canvas — a function is entered by *calling* it, so it is deliberately
+not wired to Start.
+
+- **Variables are shared**, not local. Set a variable before the call and the
+  function can read it; changes it makes are visible afterwards. That is how
+  you pass arguments and return results.
+- Functions may call other functions. Recursion is allowed but capped at 64
+  levels, which aborts the run rather than exhausting memory.
+- A body that simply runs out of nodes returns just like an explicit **Return**.
+- An **End** node inside a function ends the *whole run*, not just the call.
+- Functions are stored in the flow's own JSON, so a flow stays self-contained
+  and still runs from `runner.py` and Task Scheduler.
+
 ### Reusing blocks (copy / paste)
 
 Select nodes and copy them **with the connections between them**, so a
@@ -88,6 +113,7 @@ paste instead of by hand.
 | **Flow** | Wait, Image Condition, Counter Condition, End |
 | **Screen** | Screenshot |
 | **Variables** | Set Variable, Copy to Variable, Paste Variable, Prompt Input |
+| **Functions** | Function, Call Function, Return |
 
 ### Coordinates & templates
 

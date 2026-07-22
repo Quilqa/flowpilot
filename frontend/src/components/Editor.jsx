@@ -5,15 +5,17 @@ import ReactFlow, {
 } from "reactflow";
 import { api } from "../api.js";
 import { buildPaste, copySelection, makeEdge, parseClip } from "../clipboard.js";
+import { areaNodes, computeFunctionAreas, functionNames } from "../functions.js";
 import { NODE_DEFS, defaultParams, isCondition } from "../nodeTypes.js";
 import { nodeSummary } from "../summary.js";
 import FlowNode from "./FlowNode.jsx";
+import FunctionArea from "./FunctionArea.jsx";
 import NodePalette from "./NodePalette.jsx";
 import ParamPanel from "./ParamPanel.jsx";
 import RunView from "./RunView.jsx";
 import SettingsPanel from "./SettingsPanel.jsx";
 
-const nodeTypes = { flowNode: FlowNode };
+const nodeTypes = { flowNode: FlowNode, functionArea: FunctionArea };
 let idSeq = 1;
 const newId = () => `n${Date.now()}_${idSeq++}`;
 
@@ -224,6 +226,14 @@ export default function Editor({ flowName, onBack }) {
   }, [save]);
 
   const selectedNode = useMemo(() => nodes.find((n) => n.id === selectedId) || null, [nodes, selectedId]);
+  const fnNames = useMemo(() => functionNames(nodes), [nodes]);
+
+  // Function backdrops are derived from the graph, never part of `nodes`
+  // state — so they cannot be selected, copied, or written to the flow file.
+  const canvasNodes = useMemo(
+    () => [...areaNodes(computeFunctionAreas(nodes, edges)), ...nodes],
+    [nodes, edges],
+  );
 
   if (!meta) return <div className="screen"><p className="muted">Loading…</p></div>;
 
@@ -253,7 +263,7 @@ export default function Editor({ flowName, onBack }) {
         <div className="canvas-wrap" ref={wrapRef}
              onDrop={onDrop} onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; }}>
           <ReactFlow
-            nodes={nodes}
+            nodes={canvasNodes}
             edges={edges}
             nodeTypes={nodeTypes}
             onNodesChange={(c) => { onNodesChange(c); if (c.some((x) => x.type === "position" || x.type === "remove")) markDirty(); }}
@@ -273,6 +283,7 @@ export default function Editor({ flowName, onBack }) {
           <ParamPanel
             node={selectedNode}
             flowName={meta.name}
+            functionNames={fnNames}
             onChange={(params) => updateParams(selectedNode.id, params)}
             onDelete={() => deleteNode(selectedNode.id)}
             onClose={() => setSelectedId(null)}

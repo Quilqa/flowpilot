@@ -48,6 +48,8 @@ export default function RunView({ flowName, inputs, onClose, onActiveNode }) {
         addLog(`   set ${e.name} = ${e.value}`, "muted"); break;
       case "wait": addLog(`   wait ${e.ms}ms`, "muted"); break;
       case "screenshot": addLog(`   📷 saved ${String(e.path).split(/[\\/]/).pop()}`, "ok"); break;
+      case "function_enter": addLog(`${"  ".repeat(e.depth)}ƒ ${e.name}()`, "muted"); break;
+      case "function_return": addLog(`${"  ".repeat(e.depth + 1)}↩`, "muted"); break;
       case "paused": setPaused(true); addLog("⏸ Paused", "warn"); break;
       case "resumed": setPaused(false); addLog("▶ Resumed", "ok"); break;
       case "error": addLog(`⛔ ${e.message}`, "err"); break;

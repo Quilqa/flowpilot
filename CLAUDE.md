@@ -53,7 +53,8 @@ Six places, and validation fails loudly if you miss the first:
    interpolation.
 3. `frontend/src/nodeTypes.js` → an entry in `NODE_DEFS`. `ports` is
    `linear` | `condition` | `in` | `start`. Field types: text, textarea, number,
-   select, checkbox, xy, key, template, region. Add the group to `GROUPS` if new.
+   select, checkbox, xy, key, template, region, function. Add the group to
+   `GROUPS` if new.
 4. `frontend/src/summary.js` → a `case` for the canvas one-liner.
 5. `frontend/src/components/RunView.jsx` → a `case` if the node emits a custom
    event (the switch ignores unknown types silently).
@@ -81,6 +82,17 @@ Six places, and validation fails loudly if you miss the first:
 - **The loop guard resets on `wait`.** `_loop_counter` is cleared whenever a Wait
   node runs, so deliberately paced loops don't trip it. Loops are made by
   pointing an edge backwards — there is no loop node.
+- **Functions are graph-native, not a separate section.** A `function_start`
+  node names the function; its body is whatever is reachable from it. The
+  engine keeps a call stack (`_call_stack`) and `MAX_CALL_DEPTH` guards
+  recursion. Entering a function is handled in the `run()` traversal loop, not
+  in `_execute()` — a dead end inside a body returns to the caller instead of
+  ending the run. Variables are global; there is no local scope.
+- **Function backdrops are derived, never state.** `functions.js` computes the
+  shaded areas from nodes+edges and `Editor.jsx` prepends them only to what it
+  hands React Flow. They must stay out of `nodes` state or they would be
+  selected, copied, and written into the flow file. Their ids are prefixed
+  `__farea_`.
 - **Coordinates are DPI-sensitive.** `capture.set_dpi_awareness()` runs once at
   startup, before any capture or mouse move; changing it mid-process shifts the
   coordinate space.

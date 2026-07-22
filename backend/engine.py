@@ -104,6 +104,12 @@ class RunAborted(Exception):
     """Raised to unwind execution when stopped or panicked."""
 
 
+# A function calling itself (directly or in a cycle) would otherwise grow the
+# call stack until memory runs out; the loop guard cannot see it because each
+# node is entered only once per call.
+MAX_CALL_DEPTH = 64
+
+
 class FlowRunner:
     def __init__(
         self,
@@ -129,6 +135,16 @@ class FlowRunner:
         self._nodes: dict[str, Node] = {n.id: n for n in flow.nodes}
         self._edges = flow.edges
         self._loop_counter: dict[str, int] = {}
+        # Functions: name -> entry node id. Bodies are ordinary nodes reached
+        # by a call rather than by an edge from Start.
+        self._functions: dict[str, str] = {}
+        for n in flow.nodes:
+            if n.type == "function_start":
+                fname = str(n.params.get("name", "")).strip()
+                if fname:
+                    self._functions.setdefault(fname, n.id)
+        # Node ids to resume at, innermost call last.
+        self._call_stack: list[Optional[str]] = []
 
     # --- control -----------------------------------------------------------
 
@@ -227,7 +243,20 @@ class FlowRunner:
                     self.emit("run_end", exit_code=code, variables=self.variables)
                     return RunResult(code == 0, code, "Reached End node", self.variables)
 
-                current = self._next_node_id(node.id, port)
+                if node.type == "call_function":
+                    current = self._do_call(node)
+                    continue
+
+                if node.type == "function_return":
+                    current = self._return_to_caller()
+                    continue
+
+                nxt = self._next_node_id(node.id, port)
+                if nxt is None and self._call_stack:
+                    # A function body that runs out of nodes returns, rather
+                    # than ending the whole flow.
+                    nxt = self._return_to_caller()
+                current = nxt
 
             # Dead-end = normal completion.
             self.emit("run_end", exit_code=0, variables=self.variables)
@@ -238,6 +267,32 @@ class FlowRunner:
         except Exception as exc:  # noqa: BLE001 - report any node failure
             self.emit("error", message=f"{type(exc).__name__}: {exc}")
             return RunResult(False, 1, str(exc), self.variables)
+
+    # --- function calls ----------------------------------------------------
+
+    def _do_call(self, node: Node) -> Optional[str]:
+        """Enter a function, remembering where to resume afterwards."""
+        name = str(self._p(node, "name", "")).strip()
+        target = self._functions.get(name)
+        if target is None:
+            raise ValueError(f"Call to undefined function '{name}'")
+        if len(self._call_stack) >= MAX_CALL_DEPTH:
+            raise RecursionError(
+                f"Function call depth exceeded ({MAX_CALL_DEPTH}) while calling '{name}' — check for recursion")
+        # May be None when nothing follows the call; _return_to_caller unwinds
+        # past those so an outer caller still resumes correctly.
+        self._call_stack.append(self._next_node_id(node.id))
+        self.emit("function_enter", node_id=node.id, name=name, depth=len(self._call_stack))
+        return target
+
+    def _return_to_caller(self) -> Optional[str]:
+        """Pop back to the nearest caller that still has work left."""
+        while self._call_stack:
+            resume = self._call_stack.pop()
+            self.emit("function_return", depth=len(self._call_stack))
+            if resume is not None:
+                return resume
+        return None
 
     def _aborted(self) -> RunResult:
         self.emit("aborted", variables=self.variables)
@@ -269,7 +324,8 @@ class FlowRunner:
         """Run one node. Returns (output_port, extra_result)."""
         t = node.type
 
-        if t in ("start",):
+        # Markers handled by the traversal loop, not by executing anything.
+        if t in ("start", "function_start", "call_function", "function_return"):
             return None, None
 
         if t == "end":

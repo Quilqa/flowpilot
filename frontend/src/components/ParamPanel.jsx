@@ -4,7 +4,7 @@ import ScreenPicker from "./ScreenPicker.jsx";
 import KeyPicker from "./KeyPicker.jsx";
 import TemplateField from "./TemplateField.jsx";
 
-export default function ParamPanel({ node, flowName, onChange, onDelete, onClose }) {
+export default function ParamPanel({ node, flowName, functionNames = [], onChange, onDelete, onClose }) {
   const type = node.data.nodeType;
   const def = NODE_DEFS[type];
   const params = node.data.params || {};
@@ -30,7 +30,8 @@ export default function ParamPanel({ node, flowName, onChange, onDelete, onClose
         {def.fields.map((f) => {
           if (f.showIf && !f.showIf(params)) return null;
           return <Field key={f.key} f={f} params={params} set={set} setMany={setMany}
-                        flowName={flowName} onPick={(mode) => setPicker({ mode, field: f })} />;
+                        flowName={flowName} functionNames={functionNames}
+                        onPick={(mode) => setPicker({ mode, field: f })} />;
         })}
 
         {def.fields.length === 0 && <p className="muted">No parameters.</p>}
@@ -57,10 +58,29 @@ export default function ParamPanel({ node, flowName, onChange, onDelete, onClose
   );
 }
 
-function Field({ f, params, set, flowName, onPick }) {
+function Field({ f, params, set, flowName, functionNames = [], onPick }) {
   const val = params[f.key];
 
   switch (f.type) {
+    case "function": {
+      // Options come from the flow itself, so a call can only point at a
+      // function that exists. A name kept from a deleted function is still
+      // shown, rather than silently switching the call to something else.
+      const missing = val && !functionNames.includes(val);
+      return (
+        <div className="field">
+          <label>{f.label}</label>
+          <select value={val ?? ""} onChange={(e) => set(f.key, e.target.value)}>
+            <option value="">— pick a function —</option>
+            {functionNames.map((n) => <option key={n} value={n}>{n}</option>)}
+            {missing && <option value={val}>{val} (missing)</option>}
+          </select>
+          {missing
+            ? <span className="hint err">No function named “{val}” in this flow</span>
+            : f.hint && <span className="hint">{f.hint}</span>}
+        </div>
+      );
+    }
     case "text":
       return (
         <div className="field">

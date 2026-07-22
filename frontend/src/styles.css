@@ -88,6 +88,30 @@ body {
   font-size: 12px; overflow: hidden; box-shadow: 0 2px 6px rgba(0,0,0,.3);
 }
 .fnode.selected { box-shadow: 0 0 0 2px var(--accent); }
+
+/* Shaded region behind a function body. Decorative only — clicks must pass
+   through to the nodes drawn on top. */
+.function-area {
+  border: 1.5px dashed;
+  border-radius: 10px;
+  background: rgba(13, 148, 136, 0.07);
+  pointer-events: none;
+  box-sizing: border-box;
+}
+.function-area-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: -1.5px 0 0 -1.5px;
+  padding: 2px 10px;
+  border-radius: 8px 8px 8px 0;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.function-area-count { opacity: .75; font-weight: 400; }
+.hint.err { color: #dc2626; }
 .fnode.active { box-shadow: 0 0 0 3px #fbbf24; }
 .fnode-header { color: white; font-weight: 600; padding: 5px 9px; }
 .fnode-body { padding: 5px 9px; color: var(--muted); word-break: break-word; }
