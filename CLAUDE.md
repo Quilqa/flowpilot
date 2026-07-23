@@ -12,17 +12,21 @@ runner.py        headless CLI runner
 backend/
   models.py      Flow/Node/Edge pydantic models + validate_flow()  ← NODE_TYPES lives here
   engine.py      FlowRunner: graph traversal, variables, one _execute() per node type
-  automation.py  mouse/keyboard/clipboard wrappers (pyautogui + sendinput)
+  automation.py  mouse/keyboard/clipboard wrappers (pyautogui + sendinput + mouseinput)
   sendinput.py   Win32 SendInput: scan codes (key positions) + Unicode (characters)
-  capture.py     mss screen capture, DPI awareness
+  mouseinput.py  Win32 mouse_event: absolute moves + button holds for drags
+  capture.py     mss screen capture, DPI awareness, dpi_report()
   matching.py    OpenCV template matching
+  runmanager.py  singleton driving the one active UI run + per-run logfile
   server.py      FastAPI routes + WebSocket run stream
   storage.py     flow file IO
 frontend/src/
   nodeTypes.js   NODE_DEFS registry — drives palette, param editor, ports
   summary.js     one-line node summary shown on the canvas
   clipboard.js   copy/paste of node sub-graphs
-  components/Editor.jsx  React Flow canvas, save/autosave, keyboard shortcuts
+  functions.js   derives the shaded function-area backdrops from nodes+edges
+  components/Editor.jsx      React Flow canvas, save/autosave, undo/redo, shortcuts
+  components/FunctionArea.jsx  function backdrop + ƒ-title drag handle
 ```
 
 ## Running it
@@ -123,11 +127,20 @@ Six places, and validation fails loudly if you miss the first:
   selected, copied, and written into the flow file. Their ids are prefixed
   `__farea_`. Dragging the ƒ title translates the body: `FunctionArea` handles
   pointer events itself (the area is `draggable:false`) and converts the screen
-  delta to flow space via the live zoom, moving the area's `memberIds`.
+  delta to flow space via the live zoom, moving the area's `memberIds`. The
+  handle carries React Flow's `nopan` class — without it, `stopPropagation`
+  isn't enough and the canvas pans along with the body (RF's pan is a d3-zoom
+  listener on an ancestor, not a bubbling React handler).
 - **Undo/redo is a debounced snapshot of nodes+edges** (`Editor.jsx`). Rapid
   changes — a drag's position stream, typing in a param field — coalesce into
   one step (~350 ms). Restores set a `restoring` guard so the commit effect
   doesn't record the restore itself. History is per editor session, not saved.
+- **New nodes are placed in flow coordinates, via the RF instance.** Drop and
+  click-to-add map through `rfRef.current.screenToFlowPosition(...)` (captured
+  in `onInit`) — a drop uses the cursor point, click-to-add uses the visible
+  canvas centre. Using raw screen pixels (an earlier bug) only lines up at pan
+  (0,0) zoom 1; once panned/zoomed, nodes missed the cursor or landed off-screen
+  near the origin.
 - **Coordinates are DPI-sensitive.** `capture.set_dpi_awareness()` runs once at
   startup, before any capture or mouse move; changing it mid-process shifts the
   coordinate space.
