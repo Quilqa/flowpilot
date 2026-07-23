@@ -60,14 +60,16 @@ def main(argv: list[str] | None = None) -> int:
 
     variables = parse_vars(args.var)
 
-    # Log file: one per run.
+    # Log file: one per run. The run_id ties screenshots to this run's log.
+    stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     if args.log:
         log_path = Path(args.log)
         if not log_path.is_absolute():
             log_path = config.ROOT / log_path
+        run_id = log_path.stem  # a custom log name identifies the run
     else:
-        stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         log_path = config.LOGS_DIR / f"{flow.name}_{stamp}.log"
+        run_id = stamp
     log_path.parent.mkdir(parents=True, exist_ok=True)
     log_file = log_path.open("w", encoding="utf-8")
 
@@ -77,7 +79,7 @@ def main(argv: list[str] | None = None) -> int:
         log_file.write(line + "\n")
         log_file.flush()
 
-    runner = FlowRunner(flow, variables=variables, on_event=on_event)
+    runner = FlowRunner(flow, variables=variables, on_event=on_event, run_id=run_id)
     register_panic(config.load_config().get("panic_hotkey", "ctrl+alt+esc"), runner.stop)
 
     try:

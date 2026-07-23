@@ -151,7 +151,7 @@ export const NODE_DEFS = {
     fields: [
       { key: "region", type: "region", label: "Region", hint: "Empty = whole screen" },
       { key: "filename", type: "text", label: "File name", default: "",
-        hint: "Blank = auto. {timestamp} and {var} allowed; saved to screenshots/" },
+        hint: "Blank = auto (flow_runid_NNN). Tokens: {run_id} {n} {timestamp} {var}. Saved to screenshots/" },
       { key: "variable", type: "text", label: "Store path in", default: "screenshot_path",
         hint: "Variable holding the saved file path" },
     ],

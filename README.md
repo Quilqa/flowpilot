@@ -152,11 +152,12 @@ runs — useful for recording what a flow saw at a given step.
 
 - **Region** — empty captures the whole screen; otherwise use the rectangle
   picker, same as Image Condition.
-- **File name** — blank auto-names it `<flow>_<timestamp>.png`. You may use
-  `{timestamp}` and any flow variable, e.g. `login_{i}_{timestamp}`.
-  A fixed name overwrites on each pass; include `{timestamp}` or a loop
-  counter such as `{i}` to keep every iteration. The timestamp carries
-  milliseconds, so a tight loop still produces distinct files.
+- **File name** — blank auto-names it `<flow>_<run_id>_<NNN>.png`, so every
+  screenshot is tied to the run that took it: it shares the `<flow>_<run_id>`
+  prefix with that run's log in `logs/`, and `NNN` counts screenshots within
+  the run. Tokens you can use in a custom name: `{run_id}` (this run),
+  `{n}` (per-run counter), `{timestamp}` (millisecond stamp), and any flow
+  variable. A fixed name with no token overwrites on each pass.
 - **Store path in** — the variable receiving the saved path (default
   `screenshot_path`), so a later node can reference `{screenshot_path}`.
 
@@ -193,8 +194,11 @@ python runner.py flows/my_flow.json --var user=john --var count=5 [--log logs/cu
 ### Run logs
 
 **Every run is logged**, whether started from the UI or the CLI — one
-timestamped file per run at `logs/<flow>_<timestamp>.log`. Each line is a JSON
-event; node steps record the concrete action with variables resolved
+timestamped file per run at `logs/<flow>_<run_id>.log` (the `run_id` is that
+start timestamp). Screenshots taken during the run share the same
+`<flow>_<run_id>` prefix, so you can tell which run produced which image. Each
+line is a JSON event; node steps record the concrete action with variables
+resolved
 (`move → (640, 480) over 300ms`, `button DOWN: left`, `type "hi Ann"`), so a
 run can be analysed after the fact. The UI shows the saved log's path when a
 run finishes.

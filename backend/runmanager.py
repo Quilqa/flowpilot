@@ -55,7 +55,7 @@ class RunManager:
         # UI runs are recorded too — not just the CLI. Failure to open the log
         # must not block the run, so guard it.
         config.ensure_dirs()
-        stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        stamp = datetime.now().strftime("%Y%m%d_%H%M%S")  # also the run_id
         log_path = config.LOGS_DIR / f"{config._safe_name(flow.name)}_{stamp}.log"
         try:
             log_file = open(log_path, "w", encoding="utf-8")
@@ -74,7 +74,7 @@ class RunManager:
                     pass
             self._broadcast(event)
 
-        self._runner = FlowRunner(flow, variables=variables, on_event=on_event)
+        self._runner = FlowRunner(flow, variables=variables, on_event=on_event, run_id=stamp)
 
         def _run() -> None:
             try:

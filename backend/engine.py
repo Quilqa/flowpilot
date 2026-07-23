@@ -117,11 +117,18 @@ class FlowRunner:
         variables: Optional[dict[str, str]] = None,
         on_event: Optional[EventCallback] = None,
         cfg: Optional[dict[str, Any]] = None,
+        run_id: Optional[str] = None,
     ):
         self.flow = flow
         self.variables: dict[str, str] = {}
         self.on_event = on_event or (lambda e: None)
         self.cfg = cfg or config.load_config()
+
+        # Identifies this run. The caller passes the same stamp it uses for the
+        # log filename, so a screenshot and its run's log share a prefix
+        # (`<flow>_<run_id>`). Generated here when run standalone (e.g. tests).
+        self.run_id = run_id or time.strftime("%Y%m%d_%H%M%S")
+        self._shot_seq = 0  # per-run screenshot counter, for stable auto-names
 
         # Seed inputs with defaults, then overlay supplied values.
         for inp in flow.inputs:
@@ -213,7 +220,7 @@ class FlowRunner:
         deadline = time.monotonic() + (self.flow.settings.max_duration_ms / 1000.0)
         loop_guard = self.flow.settings.loop_guard_iterations or self.cfg.get("loop_guard_iterations", 10000)
 
-        self.emit("run_start", flow=self.flow.name)
+        self.emit("run_start", flow=self.flow.name, run_id=self.run_id)
         current: Optional[str] = start.id
         try:
             while current is not None:
@@ -489,17 +496,24 @@ class FlowRunner:
         self._sleep(ms)
 
     def _do_screenshot(self, node: Node) -> None:
-        """Save a PNG of the screen (or a region) into screenshots/."""
-        # Milliseconds are included so a screenshot inside a loop does not
-        # overwrite the previous iteration's file.
+        """Save a PNG of the screen (or a region) into screenshots/.
+
+        Auto-named files carry this run's id and a per-run sequence number, so
+        every screenshot is tied to the run that took it — it shares the
+        `<flow>_<run_id>` prefix with that run's log file — and files never
+        overwrite each other within a loop.
+        """
+        self._shot_seq += 1
         stamp = time.strftime("%Y%m%d_%H%M%S") + f"_{int(time.time() * 1000) % 1000:03d}"
         raw = str(self._p(node, "filename", "")).strip()
-        # `{timestamp}` is resolved here rather than from the variable map, so
-        # it works without the flow declaring anything. A user variable of the
-        # same name wins, since interpolation already ran.
-        raw = raw.replace("{timestamp}", stamp)
+        # These tokens are resolved here rather than from the variable map, so
+        # they work without the flow declaring anything. A user variable of the
+        # same name would already have won during interpolation.
+        raw = (raw.replace("{timestamp}", stamp)
+                  .replace("{run_id}", self.run_id)
+                  .replace("{n}", f"{self._shot_seq:03d}"))
         if not raw:
-            raw = f"{self.flow.name}_{stamp}"
+            raw = f"{self.flow.name}_{self.run_id}_{self._shot_seq:03d}"
 
         path = config.SCREENSHOTS_DIR / config.safe_filename(raw, ".png")
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -510,7 +524,8 @@ class FlowRunner:
         if var:
             self.variables[var] = str(path)
             self.emit("variable_set", name=var, value=str(path))
-        self.emit("screenshot", node_id=node.id, path=str(path), bytes=len(data))
+        self.emit("screenshot", node_id=node.id, path=str(path),
+                  run_id=self.run_id, seq=self._shot_seq, bytes=len(data))
 
     def _do_image_condition(self, node: Node) -> str:
         p = node.params
