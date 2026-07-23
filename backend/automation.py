@@ -13,6 +13,25 @@ def _pg():
     return pyautogui
 
 
+def _mouse():
+    """The hardware-like mouse backend on Windows, else None.
+
+    Routing moves/holds through mouse_event (not pyautogui's SetCursorPos) is
+    what makes a click-drag register in emulators and games — see
+    backend/mouseinput.py.
+    """
+    import sys
+
+    if sys.platform != "win32":
+        return None
+    try:
+        from . import mouseinput
+
+        return mouseinput
+    except Exception:
+        return None
+
+
 def set_failsafe(enabled: bool) -> None:
     try:
         import pyautogui
@@ -42,16 +61,28 @@ def mouse_move(x: int, y: int, duration_ms: int = 0, easing: str = "linear",
                abort_check: Optional[Callable[[], bool]] = None) -> None:
     """Move the cursor to (x, y).
 
-    When a duration is set, the move is broken into small steps so that a
-    long/eased move remains interruptible via `abort_check` (returns True to
-    stop early) — pyautogui's own `duration` blocks uninterruptibly, which
-    would delay the panic hotkey (PRD §7.4).
+    Uses the hardware-like backend so a move made while a button is held reads
+    as a real drag (emulators ignore pyautogui's moves — see mouseinput.py).
+
+    A move with a duration is broken into small steps: this both keeps the
+    panic hotkey responsive (pyautogui's own `duration` blocks uninterruptibly,
+    PRD §7.4) *and* gives a dragged control the stream of intermediate
+    positions it needs to follow the cursor — a single jump to the endpoint is
+    often seen as no drag at all.
     """
     pg = _pg()
+    m = _mouse()
     duration = max(0, duration_ms) / 1000.0
-    # Short or instant moves: a single moveTo is fine and cheaper.
+
+    def place(px: int, py: int) -> None:
+        if m is not None:
+            m.move_to(px, py)
+        else:
+            pg.moveTo(px, py, duration=0)
+
+    # Instant move, or no way to check for abort: a single placement is fine.
     if duration <= 0.03 or abort_check is None:
-        pg.moveTo(x, y, duration=duration, tween=_tween(easing))
+        place(x, y)
         return
 
     tween = _tween(easing)
@@ -61,25 +92,29 @@ def mouse_move(x: int, y: int, duration_ms: int = 0, easing: str = "linear",
         if abort_check():
             return
         frac = tween(i / steps)
-        nx = start_x + (x - start_x) * frac
-        ny = start_y + (y - start_y) * frac
-        pg.moveTo(round(nx), round(ny), duration=0)
+        place(round(start_x + (x - start_x) * frac), round(start_y + (y - start_y) * frac))
         time.sleep(duration / steps)
-    pg.moveTo(x, y, duration=0)
+    place(x, y)
 
 
 def mouse_down(button: str = "left", x: Optional[int] = None, y: Optional[int] = None) -> None:
-    pg = _pg()
+    m = _mouse()
     if x is not None and y is not None:
-        pg.moveTo(x, y)
-    pg.mouseDown(button=button)
+        (m.move_to if m is not None else _pg().moveTo)(x, y)
+    if m is not None:
+        m.button_down(button)
+    else:
+        _pg().mouseDown(button=button)
 
 
 def mouse_up(button: str = "left", x: Optional[int] = None, y: Optional[int] = None) -> None:
-    pg = _pg()
+    m = _mouse()
     if x is not None and y is not None:
-        pg.moveTo(x, y)
-    pg.mouseUp(button=button)
+        (m.move_to if m is not None else _pg().moveTo)(x, y)
+    if m is not None:
+        m.button_up(button)
+    else:
+        _pg().mouseUp(button=button)
 
 
 def mouse_click(

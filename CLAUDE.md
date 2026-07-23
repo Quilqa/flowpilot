@@ -76,6 +76,16 @@ Six places, and validation fails loudly if you miss the first:
   /`shortcut` send *key positions* (scan codes), which is what emulators and
   games need — but under a non-Latin layout a Key Press of `a` types `ф`. Don't
   "unify" these; the split is deliberate.
+- **Mouse moves/holds go through `mouseinput.py` (Win32 `mouse_event`,
+  absolute), not pyautogui.** pyautogui's `SetCursorPos` moves are ignored by
+  emulators/games, so a click-drag never registers — the slider doesn't move.
+  This is the mouse analogue of the keyboard scan-code path. A drag needs the
+  Move to have a *duration* so it streams intermediate positions; a single jump
+  reads as no drag. Absolute mapping assumes one monitor (PRD).
+- **Every run writes `logs/<flow>_<timestamp>.log`** (UI runs via
+  `runmanager.py`, CLI via `runner.py`) — one JSON event per line. Per-node
+  detail comes from `FlowRunner._describe()`, which interpolates params so the
+  log shows real values; keep it in the engine, not the frontend summary.
 - **Held keys leak on abort.** Panic/Stop raises `RunAborted` and unwinds without
   releasing keys, so aborting between `Key Down alt` and `Key Up alt` leaves Alt
   stuck. Tap the key to clear.

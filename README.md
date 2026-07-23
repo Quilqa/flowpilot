@@ -115,6 +115,24 @@ paste instead of by hand.
 | **Variables** | Set Variable, Copy to Variable, Paste Variable, Prompt Input |
 | **Functions** | Function, Call Function, Return |
 
+### Dragging (sliders, sliders-to-confirm, scrolling)
+
+A drag is **Mouse Down → Mouse Move → Mouse Up**. Mouse moves and button holds
+are sent as hardware-like events (Win32 `mouse_event`), so a drag registers in
+games and Android emulators (MuMu, LDPlayer…) that ignore ordinary synthetic
+moves. For a reliable slider:
+
+1. **Mouse Move** to the handle.
+2. **Mouse Down** (left).
+3. *(optional)* a short **Wait** (~200 ms) so the app registers the grab.
+4. **Mouse Move** to the target **with a duration set** (e.g. 400–600 ms) — the
+   duration makes the move stream intermediate positions the control can
+   follow; a zero-duration move jumps straight to the end and is often seen as
+   no drag.
+5. *(optional)* a short **Wait** (~200 ms) *before* releasing — some sliders
+   snap back if you let go before they latch.
+6. **Mouse Up** (left).
+
 ### Coordinates & templates
 
 - **XY picker** — click the crosshair on any coordinate field to pick a pixel
@@ -171,6 +189,15 @@ python runner.py flows/my_flow.json --var user=john --var count=5 [--log logs/cu
 
 - Exit code `0` on success, non-zero on failure/abort (Task Scheduler friendly).
 - A timestamped log is written to `logs/`.
+
+### Run logs
+
+**Every run is logged**, whether started from the UI or the CLI — one
+timestamped file per run at `logs/<flow>_<timestamp>.log`. Each line is a JSON
+event; node steps record the concrete action with variables resolved
+(`move → (640, 480) over 300ms`, `button DOWN: left`, `type "hi Ann"`), so a
+run can be analysed after the fact. The UI shows the saved log's path when a
+run finishes.
 
 ### Windows Task Scheduler
 

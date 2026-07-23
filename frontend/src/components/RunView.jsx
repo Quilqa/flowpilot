@@ -9,6 +9,7 @@ export default function RunView({ flowName, inputs, onClose, onActiveNode }) {
   const [liveVars, setLiveVars] = useState({});
   const [paused, setPaused] = useState(false);
   const [result, setResult] = useState(null);
+  const [logPath, setLogPath] = useState(null);
   const wsRef = useRef(null);
   const logEndRef = useRef(null);
 
@@ -38,7 +39,10 @@ export default function RunView({ flowName, inputs, onClose, onActiveNode }) {
     switch (e.type) {
       case "countdown": addLog(`Starting in ${Math.round(e.ms / 1000)}s…`, "muted"); break;
       case "run_start": addLog(`▶ Run started: ${e.flow}`, "ok"); break;
-      case "node_enter": onActiveNode?.(e.node_id); addLog(`● ${e.node_type} (${e.node_id})`); break;
+      case "node_enter":
+        onActiveNode?.(e.node_id);
+        addLog(`● ${e.label ? e.label : e.node_type}${e.detail ? ` — ${e.detail}` : ""}`);
+        break;
       case "node_exit": if (e.port) addLog(`   → ${e.port}`, "muted"); break;
       case "condition_check":
         addLog(`   check: ${e.comparison || `confidence ${e.confidence}`} → ${e.found ? "YES" : "no"}`,
@@ -58,6 +62,7 @@ export default function RunView({ flowName, inputs, onClose, onActiveNode }) {
         addLog(`✔ Finished (exit ${e.exit_code})`, e.exit_code === 0 ? "ok" : "err");
         setResult({ exit_code: e.exit_code }); break;
       case "run_finished":
+        if (e.log) setLogPath(e.log);
         setPhase("done"); onActiveNode?.(null); wsRef.current?.close(); break;
       default: break;
     }
@@ -111,6 +116,9 @@ export default function RunView({ flowName, inputs, onClose, onActiveNode }) {
               {log.map((l) => <div key={l.t} className={`log-line ${l.cls}`}>{l.line}</div>)}
               <div ref={logEndRef} />
             </div>
+            {phase === "done" && logPath && (
+              <p className="hint">Full step log saved to <span className="mono">{logPath}</span></p>
+            )}
             {Object.keys(liveVars).length > 0 && (
               <div className="var-panel">
                 <div className="var-title">Variables</div>

@@ -228,7 +228,14 @@ class FlowRunner:
                     return RunResult(False, 4, "Loop guard tripped", self.variables)
 
                 node = self._nodes[current]
-                self.emit("node_enter", node_id=node.id, node_type=node.type)
+                # `detail` is the concrete action with {var}s resolved, so the
+                # per-run log shows what actually happened at each step.
+                if node.label:
+                    self.emit("node_enter", node_id=node.id, node_type=node.type,
+                              detail=self._describe(node), label=node.label)
+                else:
+                    self.emit("node_enter", node_id=node.id, node_type=node.type,
+                              detail=self._describe(node))
                 port, result = self._execute(node)
                 self.emit("node_exit", node_id=node.id, port=port)
 
@@ -319,6 +326,57 @@ class FlowRunner:
             return int(float(interpolate(raw, self.variables)))
         except (TypeError, ValueError):
             return None
+
+    def _describe(self, node: Node) -> str:
+        """A short human-readable line of what a node does, with {var}s resolved.
+
+        Kept in the engine (not the frontend summary) because it must reflect
+        the *interpolated* values used at run time — that is what makes the log
+        analysable after the fact.
+        """
+        t = node.type
+        p = node.params
+
+        def xy() -> str:
+            if p.get("x") in (None, "") or p.get("y") in (None, ""):
+                return "current pos"
+            return f"({self._int(node, 'x')}, {self._int(node, 'y')})"
+
+        if t == "mouse_move":
+            dur = self._int(node, "duration_ms", 0)
+            return f"move → {xy()}" + (f" over {dur}ms" if dur else "")
+        if t == "mouse_down":
+            return f"button DOWN: {p.get('button', 'left')} @ {xy()}"
+        if t == "mouse_up":
+            return f"button UP: {p.get('button', 'left')} @ {xy()}"
+        if t == "mouse_click":
+            clicks = self._int(node, "clicks", 1)
+            return f"click {p.get('button', 'left')}×{clicks} @ {xy()}"
+        if t == "mouse_scroll":
+            return f"scroll {p.get('direction', 'down')} {self._int(node, 'amount', 3)}"
+        if t in ("key_down", "key_up", "key_press"):
+            verb = {"key_down": "key DOWN", "key_up": "key UP", "key_press": "key PRESS"}[t]
+            return f"{verb}: {self._p(node, 'key', '')}"
+        if t == "type_text":
+            return f'type "{self._p(node, "text", "")}"'
+        if t == "shortcut":
+            return p.get("preset") if p.get("preset") != "custom" else self._p(node, "custom_combo", "")
+        if t == "wait":
+            if p.get("random"):
+                return f"wait {self._int(node, 'min_ms')}–{self._int(node, 'max_ms')}ms"
+            return f"wait {self._int(node, 'duration_ms')}ms"
+        if t == "set_variable":
+            return f"{p.get('name', '?')} = {self._p(node, 'value', '')}"
+        if t == "screenshot":
+            return f"screenshot → {self._p(node, 'filename', '') or 'auto'}"
+        if t == "call_function":
+            return f"call {self._p(node, 'name', '')}()"
+        if t == "image_condition":
+            tmpl = str(p.get("template", "")).split("/")[-1]
+            return f"match {tmpl} @{p.get('confidence', 0.85)} ({p.get('mode', 'once')})"
+        if t == "counter_condition":
+            return f"if {self._p(node, 'variable', '')} {p.get('operator', '==')} {self._p(node, 'value', '')}"
+        return ""
 
     def _execute(self, node: Node) -> tuple[Optional[str], Any]:
         """Run one node. Returns (output_port, extra_result)."""
