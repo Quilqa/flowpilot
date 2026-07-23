@@ -55,6 +55,11 @@ export default function Editor({ flowName, onBack }) {
   const [issues, setIssues] = useState([]);
   const wrapRef = useRef(null);
   const dirtyRef = useRef(false);
+  const rfRef = useRef(null); // React Flow instance, for screen↔flow mapping
+
+  // Roughly half a node, so a dropped/added node is centred on the target
+  // point rather than hanging off its top-left corner.
+  const NODE_HALF = { x: 75, y: 23 };
 
   // Load flow.
   useEffect(() => {
@@ -85,10 +90,25 @@ export default function Editor({ flowName, onBack }) {
     markDirty();
   }, [nodes, setEdges, markDirty]);
 
-  const addNode = useCallback((type, pos) => {
+  // `flowPos` is in flow coordinates. When omitted (click-to-add), drop the
+  // node in the middle of what the camera is currently showing — not at a fixed
+  // near-origin spot, which lands off-screen once you pan or zoom.
+  const addNode = useCallback((type, flowPos) => {
     const id = newId();
     const params = defaultParams(type);
-    const position = pos || { x: 250 + Math.random() * 120, y: 120 + Math.random() * 160 };
+    let position = flowPos;
+    if (!position) {
+      const inst = rfRef.current;
+      const wrap = wrapRef.current;
+      if (inst && wrap) {
+        const r = wrap.getBoundingClientRect();
+        const c = inst.screenToFlowPosition({ x: r.left + r.width / 2, y: r.top + r.height / 2 });
+        position = { x: Math.round(c.x - NODE_HALF.x + (Math.random() * 40 - 20)),
+                     y: Math.round(c.y - NODE_HALF.y + (Math.random() * 40 - 20)) };
+      } else {
+        position = { x: 250, y: 150 };
+      }
+    }
     setNodes((nds) => nds.concat({
       id, type: "flowNode", position,
       data: { nodeType: type, params, summary: nodeSummary(type, params) },
@@ -100,9 +120,16 @@ export default function Editor({ flowName, onBack }) {
   const onDrop = useCallback((event) => {
     event.preventDefault();
     const type = event.dataTransfer.getData("application/flowpilot");
-    if (!type || !wrapRef.current) return;
-    const bounds = wrapRef.current.getBoundingClientRect();
-    addNode(type, { x: event.clientX - bounds.left - 60, y: event.clientY - bounds.top - 20 });
+    if (!type) return;
+    // Map the drop point (screen pixels) to flow coordinates, so the node lands
+    // under the cursor at any pan/zoom.
+    const inst = rfRef.current;
+    let flowPos;
+    if (inst) {
+      const p = inst.screenToFlowPosition({ x: event.clientX, y: event.clientY });
+      flowPos = { x: Math.round(p.x - NODE_HALF.x), y: Math.round(p.y - NODE_HALF.y) };
+    }
+    addNode(type, flowPos);
   }, [addNode]);
 
   const updateParams = useCallback((id, params) => {
@@ -374,6 +401,7 @@ export default function Editor({ flowName, onBack }) {
         <div className="canvas-wrap" ref={wrapRef}
              onDrop={onDrop} onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; }}>
           <ReactFlow
+            onInit={(inst) => { rfRef.current = inst; }}
             nodes={canvasNodes}
             edges={edges}
             nodeTypes={nodeTypes}
