@@ -101,23 +101,27 @@ body {
   box-sizing: border-box;
 }
 .function-area-title {
-  display: inline-flex;
+  /* Full-width header bar across the top of the area: a big drag target, so
+     you don't have to hit the ƒ glyph precisely. */
+  display: flex;
   align-items: center;
   gap: 8px;
+  box-sizing: border-box;
+  width: calc(100% + 3px);
   margin: -1.5px 0 0 -1.5px;
-  padding: 2px 10px;
-  border-radius: 8px 8px 8px 0;
+  padding: 5px 12px;
+  border-radius: 9px 9px 0 0;
   color: #fff;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   white-space: nowrap;
-  pointer-events: auto;   /* the box is inert; the title is a drag handle */
+  pointer-events: auto;   /* the box is inert; this header is the drag handle */
   cursor: grab;
   touch-action: none;
   user-select: none;
 }
 .function-area-title:active { cursor: grabbing; }
-.function-area-count { opacity: .75; font-weight: 400; }
+.function-area-count { opacity: .75; font-weight: 400; margin-left: auto; padding-left: 12px; }
 .hint.err { color: #dc2626; }
 .fnode.active { box-shadow: 0 0 0 3px #fbbf24; }
 .fnode-header { color: white; font-weight: 600; padding: 5px 9px; }

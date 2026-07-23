@@ -12,10 +12,14 @@ export default function FunctionArea({ data }) {
 
   const onPointerDown = (e) => {
     if (e.button !== 0) return;
-    e.stopPropagation();               // don't let React Flow pan the canvas
+    // Stop React Flow from also panning the canvas. stopPropagation alone is
+    // not enough — RF's pan is a d3-zoom listener on an ancestor — so the
+    // handle also carries the `nopan` class, which RF's pan filter excludes.
+    e.stopPropagation();
+    e.preventDefault();
     drag.current = { lastX: e.clientX, lastY: e.clientY };
     data.onBodyDragStart?.();          // one undo step for the whole move
-    // Capture so moves keep coming even if the cursor leaves the title; best
+    // Capture so moves keep coming even if the cursor leaves the handle; best
     // effort (a synthetic pointer has nothing to capture).
     try { e.currentTarget.setPointerCapture(e.pointerId); } catch {}
   };
@@ -41,7 +45,7 @@ export default function FunctionArea({ data }) {
   return (
     <div className="function-area"
          style={{ width: data.width, height: data.height, borderColor: FUNCTION_COLOR }}>
-      <div className="function-area-title" title="Drag to move the whole function"
+      <div className="function-area-title nopan" title="Drag to move the whole function"
            style={{ background: FUNCTION_COLOR }}
            onPointerDown={onPointerDown} onPointerMove={onPointerMove}
            onPointerUp={endDrag} onPointerCancel={endDrag}>

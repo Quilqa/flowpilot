@@ -10,7 +10,7 @@
 const FALLBACK_W = 150;
 const FALLBACK_H = 46;
 const PAD = 26;
-const TITLE_H = 22;
+const TITLE_H = 30;  // vertical room reserved above the body for the header bar
 
 /** Names of every function defined in the flow, in canvas order. */
 export function functionNames(nodes) {
