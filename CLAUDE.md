@@ -65,9 +65,11 @@ Six places, and validation fails loudly if you miss the first:
 - **Autosave persists your experiments.** The editor autosaves every 30 s when
   dirty. Adding a test node to a real flow *will* be written to `flows/*.json`.
   Delete test nodes promptly, or work on a throwaway flow.
-- **Flows and templates are gitignored** (`flows/*` except `demo_ifelse.json`,
-  `templates/*`, `screenshots/*`, `logs/*.log`). They are personal user data;
-  don't force-add without asking.
+- **Flows and templates are gitignored** (`flows/*` except `demo_ifelse.json`
+  and `standard_functions.json`, `templates/*`, `screenshots/*`, `logs/*.log`).
+  They are personal user data; don't force-add without asking.
+  `standard_functions.json` is a tracked library of reusable functions
+  (drag_and_drop, alt_tab_to) that flows copy/paste from.
 - **`pythonw` has no stdout.** `server.py` prints at startup, so running it under
   `pythonw` without redirecting output kills the process instantly and silently.
   `start_silent.vbs` redirects to `logs/server_silent.log` — keep that.

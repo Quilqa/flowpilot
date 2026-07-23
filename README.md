@@ -81,6 +81,32 @@ not wired to Start.
 - Functions are stored in the flow's own JSON, so a flow stays self-contained
   and still runs from `runner.py` and Task Scheduler.
 
+### Standard functions library
+
+`flows/standard_functions.json` ships two ready-made functions. Open it, select
+a function's nodes, **Ctrl+C**, then **Ctrl+V** into your own flow and add a
+**Call Function** node pointing at it. Because variables are global, a function
+reads its inputs from variables you set before the call.
+
+**`drag_and_drop`** — press-hold-drag-release, e.g. a confirm slider. Set before
+calling:
+
+| Variable | Meaning |
+|---|---|
+| `drag_from_x`, `drag_from_y` | where to grab |
+| `drag_to_x`, `drag_to_y` | where to release |
+
+It grabs, waits, drags over ~500 ms, holds, then releases — the timing a slider
+needs. (Coordinates come from the XY picker like any Mouse node.)
+
+**`alt_tab_to`** — Alt+Tab until the target window is focused. Set `tab_template`
+to a screenshot of the correct window (capture one with the Image Condition
+node's *Capture from screen*, then set the variable to its path, e.g.
+`templates/<flow>/mytab.png`). It escalates the number of Tab presses each
+round — Alt+Tab is most-recently-used order — up to 12 windows, and sets
+`tab_found` to `1` (focused) or `0` (gave up) so you can branch afterward with a
+Counter Condition on `tab_found`.
+
 ### Reusing blocks (copy / paste)
 
 Select nodes and copy them **with the connections between them**, so a

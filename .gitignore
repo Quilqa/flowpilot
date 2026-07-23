@@ -20,6 +20,7 @@ screenshots/*
 flows/*
 !flows/.gitkeep
 !flows/demo_ifelse.json
+!flows/standard_functions.json
 
 # OS
 Thumbs.db

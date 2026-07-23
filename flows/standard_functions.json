@@ -1,0 +1,225 @@
+{
+  "name": "standard_functions",
+  "version": 1,
+  "inputs": [],
+  "settings": {
+    "start_delay_ms": 3000,
+    "max_duration_ms": 300000,
+    "loop_guard_iterations": 10000,
+    "failsafe": true
+  },
+  "nodes": [
+    {
+      "id": "start",
+      "type": "start",
+      "params": {},
+      "position": { "x": 40.0, "y": 40.0 }
+    },
+    {
+      "id": "end_main",
+      "type": "end",
+      "label": "library — copy a function into your own flow",
+      "params": { "exit_code": 0 },
+      "position": { "x": 260.0, "y": 40.0 }
+    },
+
+    {
+      "id": "dd_start",
+      "type": "function_start",
+      "label": "reads drag_from_x/y, drag_to_x/y",
+      "params": { "name": "drag_and_drop" },
+      "position": { "x": 40.0, "y": 200.0 }
+    },
+    {
+      "id": "dd_mv_from",
+      "type": "mouse_move",
+      "label": "to handle",
+      "params": { "x": "{drag_from_x}", "y": "{drag_from_y}", "duration_ms": 0 },
+      "position": { "x": 250.0, "y": 200.0 }
+    },
+    {
+      "id": "dd_down",
+      "type": "mouse_down",
+      "params": { "button": "left" },
+      "position": { "x": 440.0, "y": 200.0 }
+    },
+    {
+      "id": "dd_grab",
+      "type": "wait",
+      "label": "grab",
+      "params": { "random": false, "duration_ms": 200 },
+      "position": { "x": 620.0, "y": 200.0 }
+    },
+    {
+      "id": "dd_mv_to",
+      "type": "mouse_move",
+      "label": "drag to target",
+      "params": { "x": "{drag_to_x}", "y": "{drag_to_y}", "duration_ms": 500 },
+      "position": { "x": 800.0, "y": 200.0 }
+    },
+    {
+      "id": "dd_hold",
+      "type": "wait",
+      "label": "let it latch",
+      "params": { "random": false, "duration_ms": 250 },
+      "position": { "x": 1000.0, "y": 200.0 }
+    },
+    {
+      "id": "dd_up",
+      "type": "mouse_up",
+      "params": { "button": "left" },
+      "position": { "x": 1180.0, "y": 200.0 }
+    },
+    {
+      "id": "dd_ret",
+      "type": "function_return",
+      "params": {},
+      "position": { "x": 1360.0, "y": 200.0 }
+    },
+
+    {
+      "id": "at_start",
+      "type": "function_start",
+      "label": "reads tab_template; sets tab_found",
+      "params": { "name": "alt_tab_to" },
+      "position": { "x": 40.0, "y": 480.0 }
+    },
+    {
+      "id": "at_seti",
+      "type": "set_variable",
+      "params": { "name": "_att_i", "value": "1" },
+      "position": { "x": 250.0, "y": 480.0 }
+    },
+    {
+      "id": "at_check",
+      "type": "image_condition",
+      "label": "is the target tab shown?",
+      "params": {
+        "template": "{tab_template}",
+        "confidence": 0.85,
+        "grayscale": true,
+        "mode": "poll",
+        "interval_ms": 250,
+        "timeout_ms": 1000
+      },
+      "position": { "x": 440.0, "y": 480.0 }
+    },
+    {
+      "id": "at_found",
+      "type": "set_variable",
+      "params": { "name": "tab_found", "value": "1" },
+      "position": { "x": 660.0, "y": 360.0 }
+    },
+    {
+      "id": "at_retok",
+      "type": "function_return",
+      "params": {},
+      "position": { "x": 860.0, "y": 360.0 }
+    },
+    {
+      "id": "at_guard",
+      "type": "counter_condition",
+      "label": "tried < 12 windows?",
+      "params": { "variable": "_att_i", "operator": "<=", "value": "12" },
+      "position": { "x": 660.0, "y": 560.0 }
+    },
+    {
+      "id": "at_giveup",
+      "type": "set_variable",
+      "params": { "name": "tab_found", "value": "0" },
+      "position": { "x": 780.0, "y": 720.0 }
+    },
+    {
+      "id": "at_retfail",
+      "type": "function_return",
+      "params": {},
+      "position": { "x": 980.0, "y": 720.0 }
+    },
+    {
+      "id": "at_resetj",
+      "type": "set_variable",
+      "params": { "name": "_att_j", "value": "0" },
+      "position": { "x": 860.0, "y": 560.0 }
+    },
+    {
+      "id": "at_altdown",
+      "type": "key_down",
+      "params": { "key": "alt" },
+      "position": { "x": 1040.0, "y": 560.0 }
+    },
+    {
+      "id": "at_presstab",
+      "type": "key_press",
+      "params": { "key": "tab", "hold_ms": 120 },
+      "position": { "x": 1220.0, "y": 560.0 }
+    },
+    {
+      "id": "at_incj",
+      "type": "set_variable",
+      "params": { "name": "_att_j", "value": "{_att_j}+1" },
+      "position": { "x": 1400.0, "y": 560.0 }
+    },
+    {
+      "id": "at_checkj",
+      "type": "counter_condition",
+      "label": "tab again?",
+      "params": { "variable": "_att_j", "operator": "<", "value": "{_att_i}" },
+      "position": { "x": 1580.0, "y": 560.0 }
+    },
+    {
+      "id": "at_twait",
+      "type": "wait",
+      "params": { "random": false, "duration_ms": 120 },
+      "position": { "x": 1400.0, "y": 720.0 }
+    },
+    {
+      "id": "at_altup",
+      "type": "key_up",
+      "params": { "key": "alt" },
+      "position": { "x": 1780.0, "y": 560.0 }
+    },
+    {
+      "id": "at_settle",
+      "type": "wait",
+      "label": "let window focus",
+      "params": { "random": false, "duration_ms": 500 },
+      "position": { "x": 1780.0, "y": 440.0 }
+    },
+    {
+      "id": "at_inci",
+      "type": "set_variable",
+      "params": { "name": "_att_i", "value": "{_att_i}+1" },
+      "position": { "x": 1780.0, "y": 320.0 }
+    }
+  ],
+  "edges": [
+    { "from": "start", "to": "end_main" },
+
+    { "from": "dd_start", "to": "dd_mv_from" },
+    { "from": "dd_mv_from", "to": "dd_down" },
+    { "from": "dd_down", "to": "dd_grab" },
+    { "from": "dd_grab", "to": "dd_mv_to" },
+    { "from": "dd_mv_to", "to": "dd_hold" },
+    { "from": "dd_hold", "to": "dd_up" },
+    { "from": "dd_up", "to": "dd_ret" },
+
+    { "from": "at_start", "to": "at_seti" },
+    { "from": "at_seti", "to": "at_check" },
+    { "from": "at_check", "to": "at_found", "port": "yes" },
+    { "from": "at_found", "to": "at_retok" },
+    { "from": "at_check", "to": "at_guard", "port": "no" },
+    { "from": "at_guard", "to": "at_resetj", "port": "yes" },
+    { "from": "at_guard", "to": "at_giveup", "port": "no" },
+    { "from": "at_giveup", "to": "at_retfail" },
+    { "from": "at_resetj", "to": "at_altdown" },
+    { "from": "at_altdown", "to": "at_presstab" },
+    { "from": "at_presstab", "to": "at_incj" },
+    { "from": "at_incj", "to": "at_checkj" },
+    { "from": "at_checkj", "to": "at_twait", "port": "yes" },
+    { "from": "at_checkj", "to": "at_altup", "port": "no" },
+    { "from": "at_twait", "to": "at_presstab" },
+    { "from": "at_altup", "to": "at_settle" },
+    { "from": "at_settle", "to": "at_inci" },
+    { "from": "at_inci", "to": "at_check" }
+  ]
+}
