@@ -90,6 +90,7 @@ export function computeFunctionAreas(nodes, edges) {
       id: `__farea_${entry.id}`,
       name: String(entry.data.params?.name || "").trim() || "unnamed",
       nodeCount: body.size,
+      memberIds: [...body],  // so dragging the ƒ block can move the whole body
       position: { x: minX - PAD, y: minY - PAD - TITLE_H },
       width: maxX - minX + PAD * 2,
       height: maxY - minY + PAD * 2 + TITLE_H,
@@ -99,13 +100,17 @@ export function computeFunctionAreas(nodes, edges) {
   return areas;
 }
 
-/** Wrap the areas as React Flow nodes that sit behind everything else. */
-export function areaNodes(areas) {
+/** Wrap the areas as React Flow nodes that sit behind everything else.
+ *  `dataExtra` (e.g. drag callbacks) is merged into every area's data. */
+export function areaNodes(areas, dataExtra = {}) {
   return areas.map((a) => ({
     id: a.id,
     type: "functionArea",
     position: a.position,
-    data: { name: a.name, width: a.width, height: a.height, nodeCount: a.nodeCount },
+    data: {
+      name: a.name, width: a.width, height: a.height,
+      nodeCount: a.nodeCount, memberIds: a.memberIds, ...dataExtra,
+    },
     draggable: false,
     selectable: false,
     connectable: false,

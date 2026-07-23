@@ -55,6 +55,9 @@ cd frontend && npm run dev  # terminal 2 (UI on :5173, proxies to the API)
    Condition nodes have two ports: **Yes** (green) / **No** (red).
 4. Click a node to edit its parameters on the right.
 5. `Ctrl+S` to save. The flow auto-saves every 30 seconds.
+6. **Undo / redo** — `Ctrl+Z` and `Ctrl+Y` (also `Ctrl+Shift+Z`), or the
+   toolbar buttons. Covers adding, deleting, connecting, moving, and pasting
+   nodes. (Inside a parameter text field these do normal text undo instead.)
 
 ### Functions (reusable named sub-flows)
 
@@ -69,7 +72,8 @@ pasting copies — fix the function and every call site changes with it.
 
 The body is drawn inside a shaded, labelled area so it reads as its own region
 of the canvas — a function is entered by *calling* it, so it is deliberately
-not wired to Start.
+not wired to Start. **Drag the ƒ block** (the area's title) to move the whole
+function — every node in its body moves together.
 
 - **Variables are shared**, not local. Set a variable before the call and the
   function can read it; changes it makes are visible afterwards. That is how

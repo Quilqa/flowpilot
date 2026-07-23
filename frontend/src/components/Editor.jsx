@@ -225,14 +225,123 @@ export default function Editor({ flowName, onBack }) {
     return () => clearInterval(t);
   }, [save]);
 
+  // --- Undo / redo -------------------------------------------------------
+  // A debounced snapshot of {nodes, edges}: rapid changes (a drag's stream of
+  // positions, typing in a param field) coalesce into one history step.
+  const nodesRef = useRef(nodes);
+  const edgesRef = useRef(edges);
+  nodesRef.current = nodes;
+  edgesRef.current = edges;
+  const histRef = useRef({ past: [], future: [], present: null });
+  const restoringRef = useRef(false);
+  const [histInfo, setHistInfo] = useState({ canUndo: false, canRedo: false });
+
+  const snapshot = useCallback(() => ({
+    // Strip transient flags so undo doesn't churn on selection/active changes,
+    // and so a restore never re-selects stale nodes.
+    nodes: nodesRef.current.map((n) => ({
+      ...n, selected: false, data: { ...n.data, active: false },
+    })),
+    edges: edgesRef.current.map((e) => ({ ...e })),
+  }), []);
+
+  const sig = (s) => JSON.stringify({
+    n: s.nodes.map((n) => [n.id, n.position.x, n.position.y, n.data.nodeType, n.data.params]),
+    e: s.edges.map((e) => [e.source, e.target, e.sourceHandle]),
+  });
+
+  // Seed the baseline once the flow has loaded.
+  useEffect(() => {
+    if (meta && histRef.current.present === null) {
+      histRef.current.present = snapshot();
+    }
+  }, [meta, snapshot]);
+
+  // Debounced commit: when the graph settles into a new shape, push the prior
+  // baseline onto the past stack.
+  useEffect(() => {
+    if (!meta || restoringRef.current) return;
+    const t = setTimeout(() => {
+      const h = histRef.current;
+      if (!h.present) { h.present = snapshot(); return; }
+      const cur = snapshot();
+      if (sig(cur) === sig(h.present)) return;
+      h.past.push(h.present);
+      if (h.past.length > 50) h.past.shift();
+      h.future = [];
+      h.present = cur;
+      setHistInfo({ canUndo: h.past.length > 0, canRedo: false });
+    }, 350);
+    return () => clearTimeout(t);
+  }, [nodes, edges, meta, snapshot]);
+
+  const applySnapshot = useCallback((snap) => {
+    restoringRef.current = true;
+    setSelectedId(null);
+    setNodes(snap.nodes.map((n) => ({ ...n, data: { ...n.data } })));
+    setEdges(snap.edges.map((e) => ({ ...e })));
+    markDirty();
+    // Let the state settle before re-enabling the debounced commit.
+    setTimeout(() => { restoringRef.current = false; }, 0);
+  }, [setNodes, setEdges, markDirty]);
+
+  const undo = useCallback(() => {
+    const h = histRef.current;
+    if (!h.past.length) return;
+    h.future.push(h.present);
+    const prev = h.past.pop();
+    h.present = prev;
+    applySnapshot(prev);
+    setHistInfo({ canUndo: h.past.length > 0, canRedo: true });
+    setStatus("Undo");
+  }, [applySnapshot]);
+
+  const redo = useCallback(() => {
+    const h = histRef.current;
+    if (!h.future.length) return;
+    h.past.push(h.present);
+    const next = h.future.pop();
+    h.present = next;
+    applySnapshot(next);
+    setHistInfo({ canUndo: true, canRedo: h.future.length > 0 });
+    setStatus("Redo");
+  }, [applySnapshot]);
+
+  useEffect(() => {
+    const editable = (t) => !!t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable);
+    const onKey = (e) => {
+      if (!(e.ctrlKey || e.metaKey) || editable(e.target)) return; // let fields do text undo
+      const k = e.key.toLowerCase();
+      if (k === "z" && !e.shiftKey) { e.preventDefault(); undo(); }
+      else if (k === "y" || (k === "z" && e.shiftKey)) { e.preventDefault(); redo(); }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [undo, redo]);
+
+  // --- Drag a whole function by its ƒ block -------------------------------
+  const translateNodes = useCallback((ids, dx, dy) => {
+    const set = new Set(ids);
+    setNodes((nds) => nds.map((n) => set.has(n.id)
+      ? { ...n, position: { x: n.position.x + dx, y: n.position.y + dy } }
+      : n));
+    markDirty();
+  }, [setNodes, markDirty]);
+
   const selectedNode = useMemo(() => nodes.find((n) => n.id === selectedId) || null, [nodes, selectedId]);
   const fnNames = useMemo(() => functionNames(nodes), [nodes]);
 
   // Function backdrops are derived from the graph, never part of `nodes`
   // state — so they cannot be selected, copied, or written to the flow file.
   const canvasNodes = useMemo(
-    () => [...areaNodes(computeFunctionAreas(nodes, edges)), ...nodes],
-    [nodes, edges],
+    () => [
+      ...areaNodes(computeFunctionAreas(nodes, edges), {
+        onBodyDragStart: () => {},        // baseline is captured by the debounce
+        onBodyTranslate: translateNodes,
+      }),
+      ...nodes,
+    ],
+    [nodes, edges, translateNodes],
   );
 
   if (!meta) return <div className="screen"><p className="muted">Loading…</p></div>;
@@ -242,9 +351,11 @@ export default function Editor({ flowName, onBack }) {
       <div className="editor-toolbar">
         <button className="btn small" onClick={onBack}>← Flows</button>
         <span className="editor-title">{meta.name}</span>
+        <button className="btn small" onClick={undo} disabled={!histInfo.canUndo} title="Undo (Ctrl+Z)">↶ Undo</button>
+        <button className="btn small" onClick={redo} disabled={!histInfo.canRedo} title="Redo (Ctrl+Y)">↷ Redo</button>
         <div className="spacer" />
-        <span className="shortcut-hint" title="Shift+drag to box-select. Ctrl+C / Ctrl+V copies nodes with the connections between them — across flows too. Ctrl+D duplicates in place.">
-          Shift+drag select · Ctrl+C/V copy · Ctrl+D duplicate
+        <span className="shortcut-hint" title="Shift+drag to box-select. Ctrl+C / Ctrl+V copies nodes with the connections between them — across flows too. Ctrl+D duplicates in place. Ctrl+Z / Ctrl+Y undo and redo. Drag a function's ƒ block to move the whole function.">
+          Ctrl+Z/Y undo · Ctrl+C/V copy · drag ƒ to move function
         </span>
         <span className="status-text">{status}</span>
         <button className="btn small" onClick={() => setShowSettings(true)}>⚙ Settings</button>

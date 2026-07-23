@@ -121,7 +121,13 @@ Six places, and validation fails loudly if you miss the first:
   shaded areas from nodes+edges and `Editor.jsx` prepends them only to what it
   hands React Flow. They must stay out of `nodes` state or they would be
   selected, copied, and written into the flow file. Their ids are prefixed
-  `__farea_`.
+  `__farea_`. Dragging the ƒ title translates the body: `FunctionArea` handles
+  pointer events itself (the area is `draggable:false`) and converts the screen
+  delta to flow space via the live zoom, moving the area's `memberIds`.
+- **Undo/redo is a debounced snapshot of nodes+edges** (`Editor.jsx`). Rapid
+  changes — a drag's position stream, typing in a param field — coalesce into
+  one step (~350 ms). Restores set a `restoring` guard so the commit effect
+  doesn't record the restore itself. History is per editor session, not saved.
 - **Coordinates are DPI-sensitive.** `capture.set_dpi_awareness()` runs once at
   startup, before any capture or mouse move; changing it mid-process shifts the
   coordinate space.

@@ -37,6 +37,8 @@ body {
 }
 .btn:hover { background: #32405a; }
 .btn.small { padding: 4px 10px; font-size: 12px; }
+.btn:disabled { opacity: .4; cursor: default; }
+.btn:disabled:hover { background: #2a3446; }
 .btn.primary { background: var(--accent); border-color: var(--accent); }
 .btn.primary:hover { background: var(--accent-hover); }
 .btn.danger { color: #fca5a5; }
@@ -109,7 +111,12 @@ body {
   font-size: 11px;
   font-weight: 600;
   white-space: nowrap;
+  pointer-events: auto;   /* the box is inert; the title is a drag handle */
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
 }
+.function-area-title:active { cursor: grabbing; }
 .function-area-count { opacity: .75; font-weight: 400; }
 .hint.err { color: #dc2626; }
 .fnode.active { box-shadow: 0 0 0 3px #fbbf24; }
