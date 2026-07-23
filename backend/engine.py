@@ -208,6 +208,7 @@ class FlowRunner:
             return RunResult(False, 2, "No Start node", self.variables)
 
         automation.set_failsafe(self.flow.settings.failsafe)
+        automation.reset_button_state()  # a prior run may have aborted mid-drag
 
         start_delay = self.flow.settings.start_delay_ms
         if start_delay:

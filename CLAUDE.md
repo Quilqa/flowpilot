@@ -76,12 +76,23 @@ Six places, and validation fails loudly if you miss the first:
   /`shortcut` send *key positions* (scan codes), which is what emulators and
   games need — but under a non-Latin layout a Key Press of `a` types `ф`. Don't
   "unify" these; the split is deliberate.
-- **Mouse moves/holds go through `mouseinput.py` (Win32 `mouse_event`,
-  absolute), not pyautogui.** pyautogui's `SetCursorPos` moves are ignored by
-  emulators/games, so a click-drag never registers — the slider doesn't move.
-  This is the mouse analogue of the keyboard scan-code path. A drag needs the
-  Move to have a *duration* so it streams intermediate positions; a single jump
-  reads as no drag. Absolute mapping assumes one monitor (PRD).
+- **Plain moves position with `SetCursorPos`; only held-button drags use
+  `mouse_event`.** `automation._held_buttons` tracks button state so `mouse_move`
+  can tell them apart. This matters for precision: `SetCursorPos` takes pixels
+  directly in the screenshot's space (what the XY picker uses), so a picked
+  pixel is hit exactly under any DPI scale. Normalizing through `mouse_event`'s
+  0..65535 absolute space (what an earlier version did for *all* moves) depends
+  on `GetSystemMetrics` matching the mss screenshot, which diverges under
+  fractional scaling / monitor changes and made the picker miss. Drags still
+  need `mouse_event` because emulators ignore `SetCursorPos`-only motion —
+  `mouseinput.move_to` does `SetCursorPos` (precise) **plus** a raw absolute
+  MOVE (recognition). `automation.reset_button_state()` is called at run start
+  so a drag aborted mid-way doesn't leave a phantom held button.
+- **DPI: use Per-Monitor-Aware-v2.** `capture.set_dpi_awareness()` prefers
+  `SetProcessDpiAwarenessContext(-4)`; under v1 the legacy metrics can report
+  scaled pixels on a monitor change. `/api/screen-size` returns `capture.dpi_report()`
+  — if `consistent` is false, the screenshot space and cursor space disagree,
+  which is the root cause of a picker that misses.
 - **Every run writes `logs/<flow>_<run_id>.log`** (UI runs via
   `runmanager.py`, CLI via `runner.py`) — one JSON event per line. Per-node
   detail comes from `FlowRunner._describe()`, which interpolates params so the

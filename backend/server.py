@@ -157,9 +157,9 @@ def api_screenshot() -> Response:
 
 
 @app.get("/api/screen-size")
-def api_screen_size() -> dict[str, int]:
+def api_screen_size() -> dict[str, Any]:
     w, h = capture.screen_size()
-    return {"width": w, "height": h}
+    return {"width": w, "height": h, "dpi": capture.dpi_report()}
 
 
 # --- Templates -------------------------------------------------------------

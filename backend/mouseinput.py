@@ -18,6 +18,7 @@ Windows-only; import lazily and fall back to pyautogui elsewhere.
 from __future__ import annotations
 
 import ctypes
+from ctypes import wintypes
 
 MOUSEEVENTF_MOVE = 0x0001
 MOUSEEVENTF_ABSOLUTE = 0x8000
@@ -34,27 +35,53 @@ _BUTTONS = {
     "middle": (MOUSEEVENTF_MIDDLEDOWN, MOUSEEVENTF_MIDDLEUP),
 }
 
-SM_CXSCREEN = 0
-SM_CYSCREEN = 1
+MOUSEEVENTF_VIRTUALDESK = 0x4000
+
+SM_XVIRTUALSCREEN = 76
+SM_YVIRTUALSCREEN = 77
+SM_CXVIRTUALSCREEN = 78
+SM_CYVIRTUALSCREEN = 79
 
 
-def _screen_size() -> tuple[int, int]:
+def _virtual_rect() -> tuple[int, int, int, int]:
+    """(left, top, width, height) of the whole virtual desktop, in the pixel
+    space our positioning uses. Absolute mouse_event coordinates are normalized
+    against this with the VIRTUALDESK flag so multi-monitor layouts map right."""
     u = ctypes.windll.user32
-    return u.GetSystemMetrics(SM_CXSCREEN), u.GetSystemMetrics(SM_CYSCREEN)
+    return (u.GetSystemMetrics(SM_XVIRTUALSCREEN), u.GetSystemMetrics(SM_YVIRTUALSCREEN),
+            u.GetSystemMetrics(SM_CXVIRTUALSCREEN), u.GetSystemMetrics(SM_CYVIRTUALSCREEN))
 
 
-def _to_absolute(x: int, y: int) -> tuple[int, int]:
-    """Pixel coordinates → the 0..65535 normalized space mouse_event expects."""
-    cx, cy = _screen_size()
-    ax = int(round(x * 65535 / max(1, cx - 1)))
-    ay = int(round(y * 65535 / max(1, cy - 1)))
-    return max(0, min(65535, ax)), max(0, min(65535, ay))
+def _raw_move_at_cursor() -> None:
+    """Emit a hardware-like absolute MOVE at the cursor's *current* position.
+
+    Derived from the real cursor position (GetCursorPos), so it lands exactly
+    where SetCursorPos already put it — no dependence on a separate coordinate
+    round-trip — while still generating the raw-input MOVE that emulators need
+    to see a drag.
+    """
+    u = ctypes.windll.user32
+    pt = wintypes.POINT()
+    u.GetCursorPos(ctypes.byref(pt))
+    vx, vy, vw, vh = _virtual_rect()
+    ax = int(round((pt.x - vx) * 65535 / max(1, vw - 1)))
+    ay = int(round((pt.y - vy) * 65535 / max(1, vh - 1)))
+    ax = max(0, min(65535, ax))
+    ay = max(0, min(65535, ay))
+    u.mouse_event(MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_VIRTUALDESK, ax, ay, 0, 0)
 
 
 def move_to(x: int, y: int) -> None:
-    """Move the cursor to a pixel position with a hardware-like absolute event."""
-    ax, ay = _to_absolute(x, y)
-    ctypes.windll.user32.mouse_event(MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE, ax, ay, 0, 0)
+    """Position the cursor exactly, then fire a raw move so drags register.
+
+    SetCursorPos takes coordinates directly in the screen's pixel space — the
+    same space the XY picker's screenshot uses — so the cursor lands precisely
+    on the picked pixel regardless of DPI scaling. The extra raw MOVE event (at
+    that exact position) is what makes a held-button drag show up in emulators
+    and games, which ignore SetCursorPos-only movement.
+    """
+    ctypes.windll.user32.SetCursorPos(int(x), int(y))
+    _raw_move_at_cursor()
 
 
 def button_down(button: str = "left") -> None:

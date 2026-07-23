@@ -56,19 +56,53 @@ def set_dpi_awareness() -> None:
     Must run once at startup, before any screen capture or mouse movement —
     changing awareness mid-process shifts the coordinate space, so a pixel
     picked from a screenshot would no longer match where clicks land.
+
+    Prefer Per-Monitor-Aware **v2** (Win10 1703+): under v1 the legacy metrics
+    (GetSystemMetrics, cursor positioning) can report scaled rather than
+    physical pixels when the monitor layout changes, which makes a picked pixel
+    miss its target on a scaled display. v2 keeps them physical and consistent.
+    Fall back to v1, then the system-DPI API, on older Windows.
     """
+    import ctypes
+
+    # DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2 = -4, passed as a pseudo-handle.
     try:
-        import ctypes
-
-        # PROCESS_PER_MONITOR_DPI_AWARE = 2 (Windows 8.1+).
-        ctypes.windll.shcore.SetProcessDpiAwareness(2)
+        ctx = ctypes.c_void_p(-4)
+        if ctypes.windll.user32.SetProcessDpiAwarenessContext(ctx):
+            return
     except Exception:
-        try:
-            import ctypes
+        pass
+    try:
+        ctypes.windll.shcore.SetProcessDpiAwareness(2)  # PER_MONITOR_AWARE (v1)
+        return
+    except Exception:
+        pass
+    try:
+        ctypes.windll.user32.SetProcessDPIAware()  # system-DPI aware
+    except Exception:
+        pass
 
-            ctypes.windll.user32.SetProcessDPIAware()
-        except Exception:
-            pass
+
+def dpi_report() -> dict:
+    """Diagnostic: compare the screenshot's pixel space (mss) with the metrics
+    used for cursor positioning. A mismatch is why a picked pixel can miss —
+    they must agree for the XY picker to be accurate."""
+    import ctypes
+
+    out: dict = {}
+    try:
+        u = ctypes.windll.user32
+        out["get_system_metrics"] = [u.GetSystemMetrics(0), u.GetSystemMetrics(1)]
+    except Exception as exc:  # noqa: BLE001
+        out["get_system_metrics"] = f"error: {exc}"
+    try:
+        out["mss_primary"] = list(screen_size())
+    except Exception as exc:  # noqa: BLE001
+        out["mss_primary"] = f"error: {exc}"
+    gsm, mss = out.get("get_system_metrics"), out.get("mss_primary")
+    out["consistent"] = isinstance(gsm, list) and gsm == mss
+    out["dpi_scale"] = dpi_scale()
+    return out
 
 
 def dpi_scale() -> float:
